@@ -6,11 +6,6 @@ pragma solidity 0.8.33;
  * @author AOXCAN Security Division
  * @notice Constitutional Gatekeeper of the AOXC Ecosystem.
  * @dev High-integrity implementation using EIP-712 structured signatures.
- * V2.0.0 Genesis Compliance:
- * 1. Rule 7 (Risk Threshold Enforcement)
- * 2. Rule 10 (Fail-Safe Mechanism)
- * 3. ERC-7201 (Namespaced Storage Integrity)
- * 4. Rule 4 (Anti-Replay via Operational Nonces)
  */
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -21,16 +16,12 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-// AOXC INTERNAL (Yollar korunmuştur)
+// AOXC INTERNAL
 import {AoxcConstants} from "aoxc-libraries/AoxcConstants.sol";
 import {AoxcErrors} from "aoxc-libraries/AoxcErrors.sol";
 import {AoxcEvents} from "aoxc-libraries/AoxcEvents.sol";
 import {IAoxcCore} from "aoxc-interfaces/IAoxcCore.sol";
 
-/**
- * @dev External interface for the Auto-Repair engine to isolate threats.
- * V2 Compliance: Packet-based handshake.
- */
 interface IAutoRepair {
     function triggerEmergencyQuarantine(
         bytes4 selector, 
@@ -38,8 +29,6 @@ interface IAutoRepair {
         IAoxcCore.NeuralPacket calldata packet
     ) external;
 }
-
-
 
 contract AoxcSentinel is
     Initializable,
@@ -56,18 +45,15 @@ contract AoxcSentinel is
     //////////////////////////////////////////////////////////////*/
 
     struct SentinelStorage {
-        address aiNodeAddress; // Trusted AI Signer
-        address coreAddress; // Constitutional Core
-        address repairEngine; // Autonomous Repair module
-        uint256 riskThreshold; // Rule 7 critical level
-        uint256 signalWindow; // Max block delay
-        bool bastionSealed; // Global emergency halt (Rule 10)
-        mapping(address => uint256) operationalNonces; // Cross-module replay protection
+        address aiNodeAddress;
+        address coreAddress;
+        address repairEngine;
+        uint256 riskThreshold;
+        uint256 signalWindow;
+        bool bastionSealed;
+        mapping(address => uint256) operationalNonces;
     }
 
-    /**
-     * @dev keccak256(abi.encode(uint256(keccak256("aoxc.storage.Sentinel")) - 1)) & ~bytes32(uint256(0xff))
-     */
     bytes32 private constant SENTINEL_STORAGE_LOCATION =
         0x9331003666f7d025170d9e9e6f2bc8b671d1796c739a8976136f78816f1f6c00;
 
@@ -75,7 +61,6 @@ contract AoxcSentinel is
         assembly { $.slot := SENTINEL_STORAGE_LOCATION }
     }
 
-    // EIP-712 Typehashes for deterministic verification
     bytes32 private constant NEURAL_PACKET_TYPEHASH =
         keccak256("NeuralPacket(address origin,address target,uint256 value,uint256 nonce,uint48 deadline,uint16 reasonCode,uint8 riskScore,bool autoRepairMode,bytes32 protocolHash)");
 
@@ -96,6 +81,7 @@ contract AoxcSentinel is
         __Pausable_init();
         __ReentrancyGuard_init();
         __EIP712_init("AoxcSentinel", "2.5");
+        __UUPSUpgradeable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(AoxcConstants.SENTINEL_ROLE, admin);
@@ -114,19 +100,12 @@ contract AoxcSentinel is
                 NEURAL HANDSHAKE VERIFIER (VIEW ONLY)
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice Performs a cryptographic check of the AI's Neural Handshake.
-     * @dev Validates the 10-point handshake via EIP-712 structured data.
-     */
     function verifyHandshake(
         IAoxcCore.NeuralPacket calldata packet
     ) external view returns (bool) {
         SentinelStorage storage $ = _getStore();
 
-        // Rule 10: Fail-close if system is sealed
         if ($.bastionSealed || paused()) return false;
-
-        // Rule 5: Expiration check
         if (block.timestamp > packet.deadline) return false;
 
         bytes32 structHash = keccak256(
@@ -145,18 +124,13 @@ contract AoxcSentinel is
         );
 
         address recovered = _hashTypedDataV4(structHash).recover(packet.neuralSignature);
-
-        // Rule 7: AI Risk Threshold Gating
         return (recovered == $.aiNodeAddress && packet.riskScore <= $.riskThreshold);
     }
 
     /*//////////////////////////////////////////////////////////////
-                    SURGICAL INTERCEPTION (EXECUTION)
+                        SURGICAL INTERCEPTION
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice Intercepts and isolates threats in real-time based on AI signals.
-     */
     function processInterception(
         uint8 riskScore,
         uint256 nonce,
@@ -166,19 +140,16 @@ contract AoxcSentinel is
     ) external nonReentrant {
         SentinelStorage storage $ = _getStore();
 
-        // 1. Integrity Check (EIP-712)
         bytes32 structHash = keccak256(abi.encode(INTERCEPTION_TYPEHASH, riskScore, nonce, target, selector));
         if (_hashTypedDataV4(structHash).recover(signature) != $.aiNodeAddress) {
             revert AoxcErrors.Aoxc_Neural_IdentityForgery();
         }
 
-        // 2. Anti-Replay (Rule 4)
         if (nonce <= $.operationalNonces[target]) {
             revert AoxcErrors.Aoxc_Neural_InvalidNonce(nonce, $.operationalNonces[target]);
         }
         $.operationalNonces[target] = nonce;
 
-        // 3. Execution (Rule 12 Surgical Defense)
         if (riskScore >= $.riskThreshold) {
             _executeIsolation($, target, selector, riskScore);
         }
@@ -186,20 +157,13 @@ contract AoxcSentinel is
         emit AoxcEvents.NeuralValidationSucceeded(structHash, msg.sender, AoxcConstants.REASON_DEFENSE_TRIGGER, riskScore);
     }
 
-    /**
-     * @dev Internal helper for isolation logic using updated Core V2 signatures.
-     */
     function _executeIsolation(SentinelStorage storage $, address target, bytes4 selector, uint8 riskScore) internal {
-        // V2 Fix: Core function name updated to 'triggerEmergencyRepair'
         try IAoxcCore($.coreAddress).triggerEmergencyRepair(selector, target, "SENTINEL_INTERCEPTION") {} 
         catch {
-             // Fallback: Global Isolation if surgical fails
              try IAoxcCore($.coreAddress).setRestrictionStatus(target, true, "SENTINEL_VETO") {} catch {}
         }
 
-        // Forward to Repair Engine if available (V2 Handshake compatible)
         if ($.repairEngine != address(0)) {
-            // Constructing a temporary packet for otonom repair signal
             IAoxcCore.NeuralPacket memory packet;
             packet.riskScore = riskScore;
             packet.reasonCode = uint16(AoxcConstants.REASON_DEFENSE_TRIGGER);
@@ -219,8 +183,15 @@ contract AoxcSentinel is
     }
 
     /*//////////////////////////////////////////////////////////////
-                            ADMINISTRATION
+                            ADMIN & AUDIT
     //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Returns EIP-712 Domain Separator for testing.
+     */
+    function DOMAIN_SEPARATOR() external view returns (bytes32) {
+        return _domainSeparatorV4();
+    }
 
     function updateRiskThreshold(uint256 newThreshold) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (newThreshold > 255) revert AoxcErrors.Aoxc_Neural_RiskTooHigh(uint8(newThreshold), 255);
@@ -229,7 +200,6 @@ contract AoxcSentinel is
 
     function _authorizeUpgrade(address) internal override onlyRole(AoxcConstants.UPGRADER_ROLE) {}
 
-    // --- Audit View Methods ---
     function isBastionSealed() external view returns (bool) { return _getStore().bastionSealed; }
     function getOperationalNonce(address target) external view returns (uint256) { return _getStore().operationalNonces[target]; }
 }

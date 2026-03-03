@@ -21,8 +21,6 @@ import {AoxcConstants} from "aoxc-libraries/AoxcConstants.sol";
 import {AoxcErrors} from "aoxc-libraries/AoxcErrors.sol";
 import {AoxcEvents} from "aoxc-libraries/AoxcEvents.sol";
 
-
-
 contract AoxcRegistry is
     Initializable,
     AccessControlUpgradeable,
@@ -51,6 +49,7 @@ contract AoxcRegistry is
         mapping(uint256 => uint256) cellLockExpiry;
     }
 
+    /// @dev Storage slot erişimi için assemly helper
     function _getStore() internal pure returns (RegistryStorageV2 storage $) {
         assembly { $.slot := REGISTRY_STORAGE_SLOT }
     }
@@ -66,8 +65,7 @@ contract AoxcRegistry is
 
     /**
      * @notice Factory uyumluluğu için V2 Initializer.
-     * @dev AoxcFactory.sol:58 satırı bu selector'ı çağırır.
-     * @param initialAdmin Sistemin ilk yöneticisi (Genelde Multisig veya Factory).
+     * @param initialAdmin Sistemin ilk yöneticisi.
      */
     function initializeRegistryV2(address initialAdmin) external initializer {
         if (initialAdmin == address(0)) revert AoxcErrors.Aoxc_InvalidAddress();
@@ -75,6 +73,7 @@ contract AoxcRegistry is
         __AccessControl_init();
         __ReentrancyGuard_init();
         __Pausable_init();
+        __UUPSUpgradeable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, initialAdmin);
         _grantRole(AoxcConstants.GOVERNANCE_ROLE, initialAdmin);
@@ -93,7 +92,6 @@ contract AoxcRegistry is
 
     /**
      * @notice Yeni bir üyeyi sisteme dahil eder.
-     * @dev restricted yerine onlyRole(GOVERNANCE_ROLE) kullanılmıştır.
      */
     function onboardMember(address member) 
         external 
@@ -193,7 +191,7 @@ contract AoxcRegistry is
     }
 
     /*//////////////////////////////////////////////////////////////
-                            VIEW FUNCTIONS
+                            VIEW FUNCTIONS (Required for Testing)
     //////////////////////////////////////////////////////////////*/
 
     function isCitizen(address account) external view returns (bool) {
@@ -202,6 +200,18 @@ contract AoxcRegistry is
 
     function getUserCell(address member) external view returns (uint256) {
         return _getStore().userToCellMap[member];
+    }
+
+    function totalCells() external view returns (uint256) {
+        return _getStore().totalCells;
+    }
+
+    function getCitizenRecord(address member) external view returns (IAoxcStorage.CitizenRecord memory) {
+        return _getStore().citizenRecords[member];
+    }
+
+    function getCellData(uint256 cellId) external view returns (IAoxcStorage.NeuralCellV2 memory) {
+        return _getStore().cells[cellId];
     }
 
     /*//////////////////////////////////////////////////////////////
