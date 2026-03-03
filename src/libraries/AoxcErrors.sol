@@ -4,12 +4,8 @@ pragma solidity 0.8.33;
 /**
  * @title AoxcErrors
  * @author AOXCAN Neural Division
- * @notice Centralized Diagnostic Library for the Akdeniz v2.0.0 Ecosystem.
- * @dev
- * AUDIT DATA:
- * - Optimized via Custom Errors (EIP-6093 style) to minimize gas consumption.
- * - Categorized for seamless AI telemetry and off-chain monitoring.
- * - Implements dynamic slots for forward-compatibility with future V3/V4 modules.
+ * @notice AOXC Otonom Ekosistemi için Merkezi Diyagnostik Kütüphanesi.
+ * @dev Gaz tüketimini minimize etmek için Custom Error (EIP-6093) kullanılmıştır.
  */
 library AoxcErrors {
     /*//////////////////////////////////////////////////////////////
@@ -18,44 +14,42 @@ library AoxcErrors {
     error Aoxc_AccessDenied();
     error Aoxc_Unauthorized(bytes32 role, address account);
     error Aoxc_InvalidAddress();
-    error Aoxc_Blacklisted(address account);
+    error Aoxc_Blacklisted(address account, string reason);
     error Aoxc_ReentrancyIntercepted();
-    error Aoxc_Neural_IdentityForgery(); // Signature or AI Proof mismatch
+    error Aoxc_Neural_IdentityForgery(); 
+    error Aoxc_GlobalLockActive();
 
     /*//////////////////////////////////////////////////////////////
                         2. DYNAMIC MODULE EXTENSIONS
     //////////////////////////////////////////////////////////////*/
-    /**
-     * @dev Generic error slot for future contracts not yet defined in this library.
-     * @param moduleId The ID of the emitting contract (e.g., 10 for AI_GAMES).
-     * @param errorCode The specific internal error code defined in that module.
-     */
     error Aoxc_Module_Error(uint8 moduleId, uint16 errorCode);
-
-    /**
-     * @dev Catch-all for unplanned logic reverts with string descriptive data.
-     */
     error Aoxc_CustomRevert(string reason);
 
     /*//////////////////////////////////////////////////////////////
                         3. NEURAL HANDSHAKE (10 LAWS)
     //////////////////////////////////////////////////////////////*/
-    error Aoxc_Neural_InvalidOrigin(); // Rule 1: msg.sender check
-    error Aoxc_Neural_InvalidTarget(); // Rule 2: Destination check
-    error Aoxc_Neural_ValueMismatch(uint256 exp, uint256 act); // Rule 3: Balance/Value
-    error Aoxc_Neural_InvalidNonce(uint256 prov, uint256 exp); // Rule 4: Replay protection
-    error Aoxc_Neural_HandshakeExpired(uint256 dl, uint256 cur); // Rule 5: Time TTL
-    error Aoxc_Neural_InvalidReasonCode(uint16 code); // Rule 6: Telemetry tagging
-    error Aoxc_Neural_RiskTooHigh(uint8 score, uint8 limit); // Rule 7: AI Risk Threshold
-    error Aoxc_Neural_RepairModeRequired(); // Rule 8: Emergency state
-    error Aoxc_Neural_ProtocolMismatch(bytes32 exp, bytes32 act); // Rule 9: Versioning
-    error Aoxc_Neural_SecurityVeto(address sentinel, uint256 risk); // Rule 10: AI Shutdown
+    error Aoxc_Neural_InvalidOrigin(); 
+    error IAoxcSentinel_Neural_InvalidOrigin();
+    error Aoxc_Neural_InvalidTarget(); 
+    error Aoxc_Neural_ValueMismatch(uint256 expected, uint256 actual); 
+    error Aoxc_Neural_InvalidNonce(uint256 provided, uint256 expected); 
+    error Aoxc_Neural_HandshakeExpired(uint256 deadline, uint256 current); 
+    error Aoxc_Neural_InvalidReasonCode(uint16 code); 
+    error Aoxc_Neural_RiskTooHigh(uint8 score, uint8 limit); 
+    error Aoxc_Neural_RepairModeRequired(); 
+    error Aoxc_Neural_ProtocolMismatch(bytes32 expected, bytes32 actual); 
+    error Aoxc_Neural_SecurityVeto(address sentinel, uint256 risk);
+    error Aoxc_Neural_BastionSealed(uint256 timestamp);
+    error Aoxc_Neural_SignatureReused(bytes32 id);
+    error Aoxc_Neural_IntegrityCheckFailed(); 
+    error Aoxc_TemporalCollision();
 
     /*//////////////////////////////////////////////////////////////
                         4. FISCAL, VAULT & ASSETS
     //////////////////////////////////////////////////////////////*/
-    error Aoxc_InsufficientBalance(uint256 avail, uint256 req);
-    error Aoxc_ExceedsDailyLimit(uint256 req, uint256 rem);
+    error Aoxc_InsufficientBalance(uint256 available, uint256 required);
+    error Aoxc_ExceedsDailyLimit(uint256 required, uint256 remaining);
+    error Aoxc_ExceedsMaxTransfer(uint256 amount, uint256 max); 
     error Aoxc_TransferFailed();
     error Aoxc_ZeroAmount();
     error Aoxc_InflationHardcapReached();
@@ -80,8 +74,8 @@ library AoxcErrors {
     error Aoxc_Repair_ModeNotActive();
     error Aoxc_ExecutionFailed();
     error Aoxc_ChainNotSupported(uint256 chainId);
-    error Aoxc_TemporalCollision(); // Block timestamp manipulation check
     error Aoxc_UpgradeBlockedBySentinel();
+    error Aoxc_NOT_SCHEDULED();
 
     /*//////////////////////////////////////////////////////////////
                         7. GOVERNANCE & NEURAL NEXUS
@@ -92,17 +86,26 @@ library AoxcErrors {
     error Aoxc_Gov_VetoPeriodActive();
     error Aoxc_Gov_UnauthorizedProposer();
     error Aoxc_Gov_ActionDelayed();
+    
+    // FIX: AoxcAuditVoice Error (9582) Resolution
+    error Aoxc_InvalidThreshold();
 
     /*//////////////////////////////////////////////////////////////
                         8. REGISTRY & REPUTATION (CORE)
     //////////////////////////////////////////////////////////////*/
     error Aoxc_Registry_UserAlreadyRegistered();
     error Aoxc_Registry_CitizenNotFound();
-    error Aoxc_Registry_ReputationTooLow(uint256 current, uint256 min);
+    error Aoxc_Registry_ReputationTooLow(uint256 current, uint256 minimum);
     error Aoxc_Registry_IdentityExpired();
 
     /*//////////////////////////////////////////////////////////////
-                        9. BRIDGE & ORACLE (FUTURE)
+                        9. TEMPORAL SECURITY (CLOCK)
+    //////////////////////////////////////////////////////////////*/
+    error Aoxc_TemporalBreach(uint256 current, uint256 expected);
+    error Aoxc_Neural_RiskThresholdBreached(uint256 score, uint256 threshold);
+
+    /*//////////////////////////////////////////////////////////////
+                        10. BRIDGE & ORACLE (FUTURE)
     //////////////////////////////////////////////////////////////*/
     error Aoxc_Bridge_InvalidSourceChain(uint256 chainId);
     error Aoxc_Bridge_MessageAlreadyProcessed(bytes32 msgHash);

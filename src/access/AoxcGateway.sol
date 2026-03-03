@@ -2,10 +2,10 @@
 pragma solidity 0.8.33;
 
 /**
- * @title AoxcGateway (Neural V2.2)
+ * @title AoxcGateway (Neural V3.0)
  * @author AOXCAN Security Architecture
  * @notice Cross-chain migration engine with Neural Proof verification.
- * @dev Optimized for OpenZeppelin 5.0+ & ERC-7201. Integrates with Sentinel V2.2.
+ * @dev Optimized for OpenZeppelin 5.0+ & ERC-7201. Integrates with Sentinel V3.0.
  */
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -15,18 +15,19 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Pau
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 // AOXC INFRASTRUCTURE
 import {IAoxcCore} from "aoxc-interfaces/IAoxcCore.sol";
 import {IAoxcSentinel} from "aoxc-interfaces/IAoxcSentinel.sol";
 import {IAoxcStorage} from "aoxc-interfaces/IAoxcStorage.sol";
+// FIX: Path ve Dosya ismi senin klasör yapına göre CamelCase yapıldı
+import {IAoxcGateway} from "aoxc-interfaces/IAoxcGateway.sol"; 
 import {AoxcConstants} from "aoxc-libraries/AoxcConstants.sol";
 import {AoxcErrors} from "aoxc-libraries/AoxcErrors.sol";
 import {AoxcEvents} from "aoxc-libraries/AoxcEvents.sol";
 
 contract AoxcGateway is
+    IAoxcGateway, // FIX: Interface ismi güncellendi
     Initializable,
     UUPSUpgradeable,
     AccessControlUpgradeable,
@@ -34,56 +35,43 @@ contract AoxcGateway is
     ReentrancyGuardUpgradeable
 {
     using SafeERC20 for IERC20;
-    using ECDSA for bytes32;
-    using MessageHashUtils for bytes32;
 
     /*//////////////////////////////////////////////////////////////
                         NAMESPACED STORAGE (DNA)
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @dev ERC-7201 compliance:
-     * keccak256(abi.encode(uint256(keccak256("aoxc.gateway.storage.v2")) - 1)) & ~bytes32(uint256(0xff))
-     */
     struct GatewayStorage {
-        address coreToken; // AOXC Token Address
-        address sentinelAi; // Sentinel V2.2 Address
-        address treasury; // Fee collection address
-        uint256 minQuantum; // Min migration amount
-        uint256 maxQuantum; // Max migration amount
-        uint256 gatewayFeeBps; // Fee in basis points
-        uint256 migrationNonce; // Unique ID generator
+        address coreToken; 
+        address sentinelAi; 
+        address treasury; 
+        uint256 minQuantum; 
+        uint256 maxQuantum; 
+        uint256 gatewayFeeBps; 
+        uint256 migrationNonce; 
         mapping(uint16 => bool) supportedChains;
         mapping(bytes32 => bool) processedMigrations;
     }
 
-    // Storage slot per ERC-7201
-    bytes32 private constant GATEWAY_STORAGE_SLOT = 0x56a64487b9f3630f9a2e6840a3597843644f7725845c2794c489b251a3d00700;
+    bytes32 private constant GATEWAY_STORAGE_SLOT = 0x56a64487b9f3630f9a2e6840a3597843644f7725845c2794c489b251a3d00800;
 
     function _getStore() internal pure returns (GatewayStorage storage $) {
         assembly { $.slot := GATEWAY_STORAGE_SLOT }
     }
-
-    /*//////////////////////////////////////////////////////////////
-                               INITIALIZATION
-    //////////////////////////////////////////////////////////////*/
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    /**
-     * @notice Initializes the Gateway with V2 specifications.
-     */
-    function initializeGatewayV2(address governor, address _coreToken, address _sentinel, address _treasury)
-        external
-        initializer
-    {
+    function initializeGatewayV3(
+        address governor, 
+        address _coreToken, 
+        address _sentinel, 
+        address _treasury
+    ) external initializer {
         __AccessControl_init();
         __Pausable_init();
         __ReentrancyGuard_init();
-        // __UUPSUpgradeable_init() is removed for OZ v5 compatibility to resolve Undeclared Identifier
 
         _grantRole(DEFAULT_ADMIN_ROLE, governor);
         _grantRole(AoxcConstants.GOVERNANCE_ROLE, governor);
@@ -94,73 +82,89 @@ contract AoxcGateway is
         $.treasury = _treasury;
         $.minQuantum = 100 * 1e18;
         $.maxQuantum = 1_000_000 * 1e18;
-        $.gatewayFeeBps = 30; // 0.30%
+        $.gatewayFeeBps = 30;
     }
 
     /*//////////////////////////////////////////////////////////////
                         MIGRATION OPERATIONS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice Initiates a cross-chain migration with Neural Handshake.
-     * @param dstChainId Destination chain identifier.
-     * @param to Recipient address on destination chain.
-     * @param amount Token amount to migrate.
-     */
     function initiateMigration(
         uint16 dstChainId,
         address to,
         uint256 amount,
-        IAoxcStorage.NeuralPacket calldata packet,
-        bytes calldata aiSignature
-    ) external payable nonReentrant whenNotPaused {
+        IAoxcCore.NeuralPacket calldata packet
+    ) external payable override nonReentrant whenNotPaused {
         GatewayStorage storage $ = _getStore();
 
         if (!$.supportedChains[dstChainId]) revert AoxcErrors.Aoxc_ChainNotSupported(uint256(dstChainId));
+        
         if (amount < $.minQuantum || amount > $.maxQuantum) {
             revert AoxcErrors.Aoxc_ExceedsMaxTransfer(amount, $.maxQuantum);
         }
 
-        // Sentinel V2.2 Validation
-        bool cleared = IAoxcSentinel($.sentinelAi).verifyAndPack(packet, aiSignature);
-        if (!cleared) revert AoxcErrors.Aoxc_Neural_BastionSealed(block.timestamp);
+        bool cleared = IAoxcSentinel($.sentinelAi).validateNeuralPacket(packet);
+        if (!cleared) revert AoxcErrors.Aoxc_Neural_SecurityVeto(msg.sender, packet.riskScore);
 
         uint256 fee = (amount * $.gatewayFeeBps) / AoxcConstants.BPS_DENOMINATOR;
         uint256 netAmount = amount - fee;
 
-        bytes32 migrationId =
-            keccak256(abi.encode(msg.sender, to, amount, dstChainId, $.migrationNonce++, block.chainid));
+        bytes32 migrationId = keccak256(
+            abi.encode(msg.sender, to, amount, dstChainId, $.migrationNonce++, block.chainid)
+        );
 
         if (fee > 0) IERC20($.coreToken).safeTransferFrom(msg.sender, $.treasury, fee);
         IERC20($.coreToken).safeTransferFrom(msg.sender, address(this), netAmount);
 
-        emit AoxcEvents.MigrationInitiated(dstChainId, msg.sender, to, amount, migrationId);
+        emit MigrationInitiated(dstChainId, msg.sender, to, amount, migrationId, packet.riskScore);
     }
 
-    /**
-     * @notice Finalizes an inbound migration from a source chain.
-     */
     function finalizeMigration(
         uint16 srcChainId,
         address to,
         uint256 amount,
         bytes32 migrationId,
-        bytes calldata /* neuralProof */
-    )
-        external
-        nonReentrant
-        whenNotPaused
-    {
+        IAoxcCore.NeuralPacket calldata packet
+    ) external override nonReentrant whenNotPaused {
         GatewayStorage storage $ = _getStore();
 
         if ($.processedMigrations[migrationId]) revert AoxcErrors.Aoxc_Neural_SignatureReused(migrationId);
 
-        // Verify Inbound Logic (Handshake with Sentinel AI)
-        $.processedMigrations[migrationId] = true;
+        bool cleared = IAoxcSentinel($.sentinelAi).validateNeuralPacket(packet);
+        if (!cleared) revert AoxcErrors.Aoxc_Neural_SecurityVeto(msg.sender, packet.riskScore);
 
+        $.processedMigrations[migrationId] = true;
         IERC20($.coreToken).safeTransfer(to, amount);
 
-        emit AoxcEvents.MigrationInFinalized(srcChainId, to, amount, migrationId);
+        emit MigrationInFinalized(srcChainId, to, amount, migrationId, packet.nonce);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            GATEWAY ANALYTICS
+    //////////////////////////////////////////////////////////////*/
+
+    function quoteGatewayFee(uint16, uint256 amount) external view override returns (uint256) {
+        return (amount * _getStore().gatewayFeeBps) / AoxcConstants.BPS_DENOMINATOR;
+    }
+
+    function isNetworkSupported(uint16 chainId) external view override returns (bool) {
+        return _getStore().supportedChains[chainId];
+    }
+
+    function migrationProcessed(bytes32 migrationId) external view override returns (bool) {
+        return _getStore().processedMigrations[migrationId];
+    }
+
+    function getGatewayLockState() external view override returns (bool isLocked, uint256 expiry) {
+        return (paused(), 0);
+    }
+
+    function getRemainingQuantum(uint16, bool) external view override returns (uint256) {
+        return _getStore().maxQuantum;
+    }
+
+    function getGatewayProtocolHash() external view override returns (bytes32) {
+        return keccak256("AOXC_GATEWAY_V3.0_STABLE");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -172,15 +176,7 @@ contract AoxcGateway is
         emit AoxcEvents.ChainSupportUpdated(chainId, status);
     }
 
-    function _authorizeUpgrade(address) internal override onlyRole(AoxcConstants.GOVERNANCE_ROLE) {}
+    function _authorizeUpgrade(address) internal override onlyRole(AoxcConstants.UPGRADER_ROLE) {}
 
-    // --- Views ---
-    function isMigrationProcessed(bytes32 migrationId) external view returns (bool) {
-        return _getStore().processedMigrations[migrationId];
-    }
-
-    /**
-     * @dev Gap for future storage upgrades.
-     */
     uint256[50] private __gap;
 }

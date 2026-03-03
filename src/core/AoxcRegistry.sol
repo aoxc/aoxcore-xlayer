@@ -4,13 +4,12 @@ pragma solidity 0.8.33;
 /**
  * @title AoxcRegistry
  * @author AOXCAN Security Architecture
- * @notice Centralized Member Registry and Cellular Manager for the AOXC Ecosystem.
- * @dev Implements ERC-7201 Namespaced Storage. Managed by AccessManager (Rule 1).
+ * @notice AOXC Ekosistemi için Merkezi Üye Kayıt Defteri ve Hücresel Yönetici.
+ * @dev ERC-7201 Namespaced Storage uygular. AccessControl ile yönetilir.
+ * V2.0.0 Standart: Factory uyumlu initializer ve Rol tabanlı erişim kontrolü.
  */
 
-import {
-    AccessManagedUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
@@ -22,20 +21,20 @@ import {AoxcConstants} from "aoxc-libraries/AoxcConstants.sol";
 import {AoxcErrors} from "aoxc-libraries/AoxcErrors.sol";
 import {AoxcEvents} from "aoxc-libraries/AoxcEvents.sol";
 
+
+
 contract AoxcRegistry is
     Initializable,
-    AccessManagedUpgradeable,
+    AccessControlUpgradeable,
     UUPSUpgradeable,
     ReentrancyGuardUpgradeable,
     PausableUpgradeable
 {
     /*//////////////////////////////////////////////////////////////
-                        NAMESPACED STORAGE (ERC-7201)
+                        NAMESPACED STORAGE (DNA)
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @dev keccak256(abi.encode(uint256(keccak256("aoxc.registry.storage.v2")) - 1)) & ~bytes32(uint256(0xff))
-     */
+    // keccak256(abi.encode(uint256(keccak256("aoxc.storage.Registry")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant REGISTRY_STORAGE_SLOT = 0x56a64487b9f3630f9a2e6840a3597843644f7725845c2794c489b251a3d00800;
 
     struct RegistryStorageV2 {
@@ -52,13 +51,12 @@ contract AoxcRegistry is
         mapping(uint256 => uint256) cellLockExpiry;
     }
 
-    /// @dev Internal helper for storage access.
     function _getStore() internal pure returns (RegistryStorageV2 storage $) {
         assembly { $.slot := REGISTRY_STORAGE_SLOT }
     }
 
     /*//////////////////////////////////////////////////////////////
-                                INITIALIZATION
+                               INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -67,16 +65,19 @@ contract AoxcRegistry is
     }
 
     /**
-     * @notice Initializes the Registry foundation.
-     * @dev Note: __UUPSUpgradeable_init() is removed in modern OZ v5 if not required by implementation.
+     * @notice Factory uyumluluğu için V2 Initializer.
+     * @dev AoxcFactory.sol:58 satırı bu selector'ı çağırır.
+     * @param initialAdmin Sistemin ilk yöneticisi (Genelde Multisig veya Factory).
      */
-    function initializeRegistryV2(address initialAuthority) external initializer {
-        __AccessManaged_init(initialAuthority);
+    function initializeRegistryV2(address initialAdmin) external initializer {
+        if (initialAdmin == address(0)) revert AoxcErrors.Aoxc_InvalidAddress();
+        
+        __AccessControl_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-        // __UUPSUpgradeable_init() is omitted here to prevent "Undeclared Identifier"
-        // as UUPSUpgradeable in v5 often doesn't require explicit internal init call
-        // unless specific internal state is modified.
+
+        _grantRole(DEFAULT_ADMIN_ROLE, initialAdmin);
+        _grantRole(AoxcConstants.GOVERNANCE_ROLE, initialAdmin);
 
         RegistryStorageV2 storage $ = _getStore();
         $.maxReputation = 1000;
@@ -90,7 +91,16 @@ contract AoxcRegistry is
                             CORE OPERATIONS
     //////////////////////////////////////////////////////////////*/
 
-    function onboardMember(address member) external restricted whenNotPaused nonReentrant {
+    /**
+     * @notice Yeni bir üyeyi sisteme dahil eder.
+     * @dev restricted yerine onlyRole(GOVERNANCE_ROLE) kullanılmıştır.
+     */
+    function onboardMember(address member) 
+        external 
+        onlyRole(AoxcConstants.GOVERNANCE_ROLE) 
+        whenNotPaused 
+        nonReentrant 
+    {
         if (member == address(0)) revert AoxcErrors.Aoxc_InvalidAddress();
 
         RegistryStorageV2 storage $ = _getStore();
@@ -119,7 +129,14 @@ contract AoxcRegistry is
         emit AoxcEvents.MemberOnboarded(member, targetCell, 0);
     }
 
-    function adjustReputation(address member, int256 adjustment, uint16 reasonCode) external restricted whenNotPaused {
+    /**
+     * @notice Üyenin itibar puanını günceller.
+     */
+    function adjustReputation(address member, int256 adjustment, uint16 reasonCode) 
+        external 
+        onlyRole(AoxcConstants.GOVERNANCE_ROLE) 
+        whenNotPaused 
+    {
         if (adjustment == 0) return;
 
         RegistryStorageV2 storage $ = _getStore();
@@ -142,7 +159,7 @@ contract AoxcRegistry is
     }
 
     /*//////////////////////////////////////////////////////////////
-                             INTERNAL HELPERS
+                            INTERNAL HELPERS
     //////////////////////////////////////////////////////////////*/
 
     function _checkStatus(RegistryStorageV2 storage $, address member, IAoxcStorage.CitizenRecord storage citizen)
@@ -151,11 +168,11 @@ contract AoxcRegistry is
         if (citizen.reputation < $.quarantineThreshold && !citizen.isBlacklisted) {
             citizen.isBlacklisted = true;
             citizen.blacklistReason = "QUARANTINE_REPUTATION_FAILURE";
-            emit AoxcEvents.BlacklistUpdated(member, true, 500);
+            emit AoxcEvents.BlacklistUpdated(member, true, "LOW_REPUTATION");
         } else if (citizen.isBlacklisted && citizen.reputation >= $.recoveryThreshold) {
             citizen.isBlacklisted = false;
             citizen.blacklistReason = "";
-            emit AoxcEvents.BlacklistUpdated(member, false, 100);
+            emit AoxcEvents.BlacklistUpdated(member, false, "REPUTATION_RESTORED");
         }
     }
 
@@ -175,8 +192,23 @@ contract AoxcRegistry is
         return newId;
     }
 
-    /// @dev Authorized upgrade function for UUPS.
-    function _authorizeUpgrade(address newImplementation) internal override restricted {}
+    /*//////////////////////////////////////////////////////////////
+                            VIEW FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function isCitizen(address account) external view returns (bool) {
+        return _getStore().citizenRecords[account].citizenId != 0;
+    }
+
+    function getUserCell(address member) external view returns (uint256) {
+        return _getStore().userToCellMap[member];
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            UUPS UPGRADE
+    //////////////////////////////////////////////////////////////*/
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 
     uint256[50] private __gap;
 }

@@ -3,9 +3,9 @@ pragma solidity 0.8.33;
 
 /**
  * @title AoxcConstants
- * @author AOXCAN
+ * @author AOXCAN Neural Division
  * @notice Centralized constants for the Akdeniz v2.0.0 DAO Ecosystem.
- * @dev Pro-Level: Future-proof roles and neural risk parameters integrated.
+ * @dev Optimized for Neural V3 Handshake & Autonomous Infrastructure.
  */
 library AoxcConstants {
     /*//////////////////////////////////////////////////////////////
@@ -20,12 +20,15 @@ library AoxcConstants {
     bytes32 internal constant SENTINEL_ROLE = keccak256("Aoxc.ROLE.SENTINEL");
     bytes32 internal constant TREASURY_ROLE = keccak256("Aoxc.ROLE.TREASURY");
     bytes32 internal constant UPGRADER_ROLE = keccak256("Aoxc.ROLE.UPGRADER");
+    
+    // FIX: NEXUS & VAULT Error (9582) Resolution
+    bytes32 internal constant AUDIT_VOICE_ROLE = keccak256("Aoxc.ROLE.AUDIT_VOICE");
 
     // Future Expansion Roles
-    bytes32 internal constant ORACLE_ROLE = keccak256("Aoxc.ROLE.ORACLE"); // For AI data feeds
-    bytes32 internal constant BRIDGE_ROLE = keccak256("Aoxc.ROLE.BRIDGE"); // For X Layer Cross-chain
-    bytes32 internal constant LIQUIDITY_ROLE = keccak256("Aoxc.ROLE.LIQUIDITY"); // For AoxcChange engine
-    bytes32 internal constant ARCHITECT_ROLE = keccak256("Aoxc.ROLE.ARCHITECT"); // For Factory V3 upgrades
+    bytes32 internal constant ORACLE_ROLE = keccak256("Aoxc.ROLE.ORACLE");
+    bytes32 internal constant BRIDGE_ROLE = keccak256("Aoxc.ROLE.BRIDGE");
+    bytes32 internal constant LIQUIDITY_ROLE = keccak256("Aoxc.ROLE.LIQUIDITY");
+    bytes32 internal constant ARCHITECT_ROLE = keccak256("Aoxc.ROLE.ARCHITECT");
 
     /*//////////////////////////////////////////////////////////////
                         AI & NEURAL SENTINEL (V3)
@@ -49,18 +52,23 @@ library AoxcConstants {
     uint16 internal constant REASON_MERIT_REWARD = 300;
     uint16 internal constant REASON_MIGRATION_OUT = 400;
     uint16 internal constant REASON_DEFENSE_TRIGGER = 500;
-    uint16 internal constant REASON_VOTE_VETO = 700; // AI Veto reason
+    
+    // FIX: Vault Error (9582) Resolution - Otonom Geçit Kodu
+    uint16 internal constant REASON_REPAIR_OVERRIDE = 600;
+    
+    uint16 internal constant REASON_VOTE_VETO = 700;
     uint16 internal constant REASON_EMERGENCY_PATCH = 911;
 
     /*//////////////////////////////////////////////////////////////
-                        ERC-7201 STORAGE SLOTS
+                        ERC-7201 STORAGE SLOTS (DNA)
     //////////////////////////////////////////////////////////////*/
-    bytes32 internal constant BUILD_STORAGE_SLOT = keccak256("Aoxc.Storage.Build.v1");
+    // keccak256(abi.encode(uint256(keccak256("aoxc.storage.X")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 internal constant BUILD_STORAGE_SLOT = 0x56a64487b9f3630f9a2e6840a3597843644f7725845c2794c489b251a3d00800;
     bytes32 internal constant MAIN_STORAGE_SLOT = 0x27f884a8677c731e8093d6e5a4073f1d8595531d054d5d71c1815e98544e3d00;
-    bytes32 internal constant NEXUS_V2_SLOT = keccak256("Aoxc.Storage.Nexus.v2");
+    bytes32 internal constant NEXUS_V2_SLOT = 0x56a64487b9f3630f9a2e6840a3597843644f7725845c2794c489b251a3d00900;
     bytes32 internal constant REGISTRY_V2_SLOT = 0x4d6368d14745c479549f50e8544e877e59b9511d124d5d71c1815e98544e3000;
     bytes32 internal constant STAKING_STORAGE_SLOT = 0x07f15e855018f36c53e04a43f8e5276e09968412676063467472173957291a00;
-    bytes32 internal constant VAULT_V2_SLOT = keccak256("Aoxc.Storage.Vault.v2");
+    bytes32 internal constant VAULT_V2_SLOT = 0x56a64487b9f3630f9a2e6840a3597843644f7725845c2794c489b251a3d00100;
 
     /*//////////////////////////////////////////////////////////////
                         FISCAL & STAKING LIMITS

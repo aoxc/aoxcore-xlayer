@@ -2,10 +2,10 @@
 pragma solidity 0.8.33;
 
 /**
- * @title AoxcAuditVoice (Neural V2.2)
+ * @title AoxcAuditVoice
  * @author AOXCAN Governance Division
  * @notice Community-driven Veto Signaling. Allows members to block malicious proposals.
- * @dev Optimized for OZ 5.0+ & ERC-7201. Implements Rule 10: Democratic Veto.
+ * @dev V2.0.0 Genesis Compliance: Integrated 10-Point Neural Handshake (Rule 10).
  */
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -21,6 +21,8 @@ import {IAoxcCore} from "aoxc-interfaces/IAoxcCore.sol";
 import {AoxcConstants} from "aoxc-libraries/AoxcConstants.sol";
 import {AoxcErrors} from "aoxc-libraries/AoxcErrors.sol";
 import {AoxcEvents} from "aoxc-libraries/AoxcEvents.sol";
+
+
 
 contract AoxcAuditVoice is
     IAoxcAuditVoice,
@@ -44,12 +46,14 @@ contract AoxcAuditVoice is
     struct AuditVoiceStore {
         address nexus;
         address aoxcToken;
+        address core; // Link to Neural Core for handshake
         uint256 vetoThresholdBps;
         uint256 minimumVetoPower;
+        bytes32 auditProtocolHash;
         mapping(uint256 => AuditSignal) proposalSignals;
     }
 
-    // ERC-7201 Compliance
+    // keccak256(abi.encode(uint256(keccak256("aoxc.audit.voice.storage.v2")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant AUDIT_VOICE_STORAGE_SLOT =
         0x89e5a1b068224578964573895245892345892345892345892345892345892300;
 
@@ -66,21 +70,27 @@ contract AoxcAuditVoice is
         _disableInitializers();
     }
 
-    function initializeAuditVoiceV2(address admin, address nexus, address token) external initializer {
-        if (admin == address(0) || nexus == address(0) || token == address(0)) revert AoxcErrors.Aoxc_InvalidAddress();
+    function initializeAuditVoiceV2(
+        address core, 
+        address nexus, 
+        address token, 
+        bytes32 protocolHash
+    ) external initializer {
+        if (core == address(0) || nexus == address(0) || token == address(0)) revert AoxcErrors.Aoxc_InvalidAddress();
 
         __AccessControl_init();
         __ReentrancyGuard_init();
-        // __UUPSUpgradeable_init(); // REMOVED: Not present in OZ v5
 
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(AoxcConstants.GOVERNANCE_ROLE, admin);
-        _grantRole(AoxcConstants.UPGRADER_ROLE, admin);
+        _grantRole(DEFAULT_ADMIN_ROLE, core);
+        _grantRole(AoxcConstants.GOVERNANCE_ROLE, core);
+        _grantRole(AoxcConstants.UPGRADER_ROLE, core);
 
         AuditVoiceStore storage $ = _getStore();
+        $.core = core;
         $.nexus = nexus;
         $.aoxcToken = token;
-        $.vetoThresholdBps = 500; // 5% default
+        $.auditProtocolHash = protocolHash;
+        $.vetoThresholdBps = 500; // 5% Veto Threshold
         $.minimumVetoPower = 1000 * 1e18;
     }
 
@@ -88,8 +98,21 @@ contract AoxcAuditVoice is
                         VETO SIGNALING (CORE)
     //////////////////////////////////////////////////////////////*/
 
-    function emitVetoSignal(uint256 proposalId) external override nonReentrant {
+    /**
+     * @inheritdoc IAoxcAuditVoice
+     * @notice Emits a veto signal verified by Neural Handshake.
+     */
+    function emitVetoSignal(
+        uint256 proposalId, 
+        IAoxcCore.NeuralPacket calldata packet
+    ) external override nonReentrant {
         AuditVoiceStore storage $ = _getStore();
+        
+        // Rule 7 & 10: Validate user authority and risk through Core
+        if (!IAoxcCore($.core).executeNeuralAction(packet)) {
+            revert AoxcErrors.Aoxc_Neural_SecurityVeto(msg.sender, packet.riskScore);
+        }
+
         AuditSignal storage signal = $.proposalSignals[proposalId];
 
         if (signal.thresholdReached) revert AoxcErrors.Aoxc_CustomRevert("VETO: FINALIZED");
@@ -113,23 +136,33 @@ contract AoxcAuditVoice is
         uint256 requiredThreshold = (totalSupply * $.vetoThresholdBps) / AoxcConstants.BPS_DENOMINATOR;
 
         if (signal.totalVetoPower >= requiredThreshold) {
-            _executeIntervention($, proposalId, signal);
+            _executeIntervention($, proposalId, packet);
         }
     }
 
-    function _executeIntervention(AuditVoiceStore storage $, uint256 proposalId, AuditSignal storage signal) internal {
+    /**
+     * @inheritdoc IAoxcAuditVoice
+     */
+    function recordAuditTrace(IAoxcCore.NeuralPacket calldata packet) external override nonReentrant {
+        AuditVoiceStore storage $ = _getStore();
+        if (!IAoxcCore($.core).executeNeuralAction(packet)) {
+            revert AoxcErrors.Aoxc_Neural_SecurityVeto(msg.sender, packet.riskScore);
+        }
+        emit AoxcEvents.NeuralSignalProcessed("AUDIT_TRACE_OK", abi.encode(packet.origin, packet.nonce));
+    }
+
+    function _executeIntervention(
+        AuditVoiceStore storage $, 
+        uint256 proposalId, 
+        IAoxcCore.NeuralPacket calldata packet
+    ) internal {
+        AuditSignal storage signal = $.proposalSignals[proposalId];
         signal.thresholdReached = true;
         signal.finalizedAt = block.timestamp;
 
-        // NeuralPacket construction for IAoxcNexus compliance
-        IAoxcCore.NeuralPacket memory packet = IAoxcCore.NeuralPacket({
-            riskScore: 255, // Max danger
-            reason: "COMMUNITY_VETO_ACTIVE",
-            metadata: ""
-        });
-
+        // Propagate Veto to Nexus with otonom risk markers
         try IAoxcNexus($.nexus).processNeuralVeto(proposalId, packet) {
-            emit AoxcEvents.KarujanNeuralVeto(proposalId, 255);
+            emit AoxcEvents.KarujanNeuralVeto(proposalId, packet.riskScore);
         } catch {
             emit AoxcEvents.AutonomousCorrectionFailed(
                 keccak256("VETO_INTERVENTION"), "NEXUS_UNREACHABLE", block.timestamp
@@ -138,11 +171,15 @@ contract AoxcAuditVoice is
     }
 
     /*//////////////////////////////////////////////////////////////
-                                VIEWS
+                            VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     function isVetoed(uint256 proposalId) external view override returns (bool) {
         return _getStore().proposalSignals[proposalId].thresholdReached;
+    }
+
+    function getAuditProtocolVersion() external view override returns (bytes32) {
+        return _getStore().auditProtocolHash;
     }
 
     function getVetoSignalStatus(uint256 proposalId) external view override returns (uint256 power, bool reached) {

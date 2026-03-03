@@ -5,14 +5,14 @@ pragma solidity 0.8.33;
  * @title AoxcNexus
  * @author AOXCAN Security Division
  * @notice Sovereign Governance Layer with Neural Veto & AI-Vetted Voting.
- * @dev Optimized for OpenZeppelin 5.0+. Fully compliant with IAoxcNexus.
+ * @dev Optimized for OpenZeppelin 5.0+. Compatible with AoxcFactory V2.
  */
 
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol"; // <--- ADDED
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
@@ -30,7 +30,7 @@ contract AoxcNexus is
     Initializable,
     AccessControlUpgradeable,
     ReentrancyGuardUpgradeable,
-    PausableUpgradeable, // <--- CRITICAL FIX: Added for paused() support
+    PausableUpgradeable,
     UUPSUpgradeable
 {
     using MessageHashUtils for bytes32;
@@ -64,7 +64,8 @@ contract AoxcNexus is
         mapping(uint256 => mapping(address => bool)) hasVoted;
     }
 
-    bytes32 private constant NEXUS_STORAGE_SLOT = 0x56a64487b9f3630f9a2e6840a3597843644f7725845c2794c489b251a3d00900;
+    // keccak256(abi.encode(uint256(keccak256("aoxc.storage.Nexus")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant NEXUS_STORAGE_SLOT = 0x56a64487b9f3630f9a2e6840a3597843644f7725845c2794c489b251a3d00800;
 
     function _getStore() internal pure returns (NexusStorage storage $) {
         assembly { $.slot := NEXUS_STORAGE_SLOT }
@@ -79,10 +80,13 @@ contract AoxcNexus is
         _disableInitializers();
     }
 
+    /**
+     * @notice Updated to V2 to match Factory selector.
+     */
     function initializeNexusV2(address admin, address auditVoice, address token) external initializer {
         __AccessControl_init();
         __ReentrancyGuard_init();
-        __Pausable_init(); // <--- ADDED
+        __Pausable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(AoxcConstants.AUDIT_VOICE_ROLE, auditVoice);
@@ -97,7 +101,7 @@ contract AoxcNexus is
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainid,address verifyingContract)"),
                 keccak256("AoxcNexus"),
-                keccak256("V3.0.0"),
+                keccak256("V2.0.0"),
                 block.chainid,
                 address(this)
             )
@@ -139,27 +143,24 @@ contract AoxcNexus is
     function queue(
         uint256 proposalId,
         IAoxcCore.NeuralPacket calldata /* packet */
-    )
-        external
-        override
-    {
-        emit AoxcEvents.ProposalQueued(proposalId, block.timestamp + 2 days, 0);
+    ) external override {
+        NexusStorage storage $ = _getStore();
+        if (!$.proposals[proposalId].exists) revert AoxcErrors.Aoxc_CustomRevert("NEXUS: NOT_FOUND");
+        
+        uint256 eta = block.timestamp + AoxcConstants.REPAIR_TIMELOCK;
+        emit AoxcEvents.ProposalQueued(proposalId, eta, AoxcConstants.REPAIR_TIMELOCK);
     }
 
     function execute(
         uint256 proposalId,
         IAoxcCore.NeuralPacket calldata /* packet */
-    )
-        external
-        payable
-        override
-        nonReentrant
-    {
+    ) external payable override nonReentrant whenNotPaused {
         if (state(proposalId) != ProposalState.Succeeded) {
             revert AoxcErrors.Aoxc_CustomRevert("NEXUS: STATE_NOT_READY");
         }
         _getStore().proposals[proposalId].executed = true;
-        emit AoxcEvents.ProposalExecuted(proposalId, 0);
+        
+        emit AoxcEvents.ProposalExecuted(proposalId, 100);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -177,7 +178,8 @@ contract AoxcNexus is
         $.proposals[proposalId].vetoed = true;
         $.proposals[proposalId].aiRiskScore = packet.riskScore;
 
-        emit AoxcEvents.KarujanNeuralVeto(proposalId, packet.riskScore, bytes32(0));
+        // V2-X Event Sync: Uses both protocolHash and riskScore
+        emit AoxcEvents.KarujanNeuralVeto(proposalId, packet.protocolHash, packet.riskScore);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -185,17 +187,13 @@ contract AoxcNexus is
     //////////////////////////////////////////////////////////////*/
 
     function castVote(uint256 proposalId, uint8 support, IAoxcCore.NeuralPacket calldata packet)
-        external
-        override
-        returns (uint256 weight)
+        external override returns (uint256 weight)
     {
         return _executeVote(msg.sender, proposalId, support, packet.riskScore);
     }
 
     function castVoteBySig(uint256 proposalId, uint8 support, IAoxcCore.NeuralPacket calldata packet)
-        external
-        override
-        returns (uint256 weight)
+        external override returns (uint256 weight)
     {
         return _executeVote(msg.sender, proposalId, support, packet.riskScore);
     }
@@ -213,7 +211,7 @@ contract AoxcNexus is
         if (support == 1) $.proposals[id].forVotes += weight;
         else $.proposals[id].againstVotes += weight;
 
-        emit AoxcEvents.VoteCast(voter, id, weight, risk);
+        emit AoxcEvents.VoteCast(voter, id, support, weight, risk);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -234,27 +232,12 @@ contract AoxcNexus is
         return (p.forVotes > p.againstVotes && quorumMet) ? ProposalState.Succeeded : ProposalState.Defeated;
     }
 
-    function proposalSnapshot(uint256 id) external view override returns (uint256) {
-        return _getStore().proposals[id].snapshot;
-    }
+    function proposalSnapshot(uint256 id) external view override returns (uint256) { return _getStore().proposals[id].snapshot; }
+    function proposalDeadline(uint256 id) external view override returns (uint256) { return _getStore().proposals[id].endTime; }
+    function proposalProposer(uint256 id) external view override returns (address) { return _getStore().proposals[id].proposer; }
+    function proposalRiskScore(uint256 id) external view override returns (uint8) { return _getStore().proposals[id].aiRiskScore; }
+    function quorum(uint256) external view override returns (uint256) { return _getStore().quorumNumerator; }
 
-    function proposalDeadline(uint256 id) external view override returns (uint256) {
-        return _getStore().proposals[id].endTime;
-    }
-
-    function proposalProposer(uint256 id) external view override returns (address) {
-        return _getStore().proposals[id].proposer;
-    }
-
-    function proposalRiskScore(uint256 id) external view override returns (uint8) {
-        return _getStore().proposals[id].aiRiskScore;
-    }
-
-    function quorum(uint256) external view override returns (uint256) {
-        return _getStore().quorumNumerator;
-    }
-
-    // Fixed: paused() now accessible via PausableUpgradeable inheritance
     function getNexusLockState() external view override returns (bool isLocked, uint256 cooldownRemaining) {
         return (paused(), 0);
     }

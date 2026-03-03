@@ -4,12 +4,12 @@ pragma solidity 0.8.33;
 import {IAoxcCore} from "./IAoxcCore.sol";
 
 /**
- * @title IAoxcGATEWAY
+ * @title IAoxcGateway
  * @author Aoxcore Security Architecture
- * @notice Interface for Autonomous Cross-Chain Migrations and Neural Vetting.
- * @dev V3.0: Enforces 10-Point Neural Handshake to eliminate bridge-drain attacks.
+ * @notice Autonomous Cross-Chain Migration ve Neural Vetting Arayüzü.
+ * @dev V3.0: Köprü saldırılarını önlemek için 10-Noktalı Neural Handshake zorunlu kılar.
  */
-interface IAoxcGATEWAY {
+interface IAoxcGateway {
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -24,33 +24,40 @@ interface IAoxcGATEWAY {
     );
 
     event MigrationInFinalized(
-        uint16 indexed srcChainId, address indexed to, uint256 amount, bytes32 migrationId, uint256 nonce
+        uint16 indexed srcChainId, 
+        address indexed to, 
+        uint256 amount, 
+        bytes32 migrationId, 
+        uint256 nonce
     );
 
     event NeuralAnomalyNeutralized(bytes32 indexed migrationId, uint8 riskScore, uint16 reasonCode);
 
     /*//////////////////////////////////////////////////////////////
-                        MIGRATION OPERATIONS
+                         MIGRATION OPERATIONS
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Rule 1, 2, 3 & 7: Initiates an outbound migration with AI risk check.
-     * @param dstChainId Destination network ID.
-     * @param to Recipient address on the destination chain.
-     * @param amount Amount of assets to migrate.
-     * @param packet The 10-point handshake verifying the source-chain's authority.
+     * @notice Kural 1, 2, 3 & 7: AI risk kontrolü ile dışa transfer (outbound) başlatır.
+     * @param dstChainId Hedef ağ ID'si.
+     * @param to Hedef ağdaki alıcı adresi.
+     * @param amount Transfer edilecek varlık miktarı.
+     * @param packet Transfer yetkisini doğrulayan 10-noktalı handshake paketi.
      */
-    function initiateMigration(uint16 dstChainId, address to, uint256 amount, IAoxcCore.NeuralPacket calldata packet)
-        external
-        payable;
+    function initiateMigration(
+        uint16 dstChainId, 
+        address to, 
+        uint256 amount, 
+        IAoxcCore.NeuralPacket calldata packet
+    ) external payable;
 
     /**
-     * @notice Rule 10: Finalizes an inbound migration via AI cryptographic proof.
-     * @param srcChainId Source network ID.
-     * @param to Recipient address on X Layer.
-     * @param amount Amount of assets arriving.
-     * @param migrationId Unique ID for the cross-chain transaction.
-     * @param packet The 10-point handshake confirming the validity of the inbound message.
+     * @notice Kural 10: AI kriptografik kanıtı ile gelen (inbound) transferi tamamlar.
+     * @param srcChainId Kaynak ağ ID'si.
+     * @param to X Layer'daki alıcı adresi.
+     * @param amount Gelen varlık miktarı.
+     * @param migrationId Transferin benzersiz ID'si.
+     * @param packet Gelen mesajın geçerliliğini onaylayan 10-noktalı handshake paketi.
      */
     function finalizeMigration(
         uint16 srcChainId,
@@ -67,12 +74,12 @@ interface IAoxcGATEWAY {
     function getGatewayLockState() external view returns (bool isLocked, uint256 expiry);
 
     /**
-     * @notice Returns the required native fee for cross-chain transmission.
+     * @notice Transfer için gereken yerel (native) fee miktarını döndürür.
      */
     function quoteGatewayFee(uint16 dstChainId, uint256 amount) external view returns (uint256 nativeFee);
 
     /**
-     * @notice Rule 3: Returns the remaining 'Quantum' (liquidity limit) for a chain.
+     * @notice Kural 3: Bir ağ için kalan 'Quantum' (likidite limiti) miktarını döndürür.
      */
     function getRemainingQuantum(uint16 chainId, bool isOutbound) external view returns (uint256 remaining);
 
@@ -80,7 +87,7 @@ interface IAoxcGATEWAY {
     function migrationProcessed(bytes32 migrationId) external view returns (bool);
 
     /**
-     * @notice Rule 9: Validates if the gateway protocol is in sync with Core.
+     * @notice Kural 9: Gateway protokolünün Core ile senkronize olup olmadığını doğrular.
      */
     function getGatewayProtocolHash() external view returns (bytes32);
 }
