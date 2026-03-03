@@ -1,4 +1,4 @@
-# 🏛️ AOXC-Core: The Sovereign Fleet (V2.5.7)
+# 🏛️ AOXC-Core: The Sovereign Fleet (V2.0.0)
 
 [![Network: X Layer](https://img.shields.io/badge/Network-X_Layer_Testnet-blueviolet?style=for-the-badge)](https://xlayer.okx.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](https://opensource.org/licenses/MIT)
