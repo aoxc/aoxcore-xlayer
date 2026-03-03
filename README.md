@@ -1,4 +1,4 @@
-# 🏛️ AOXC-Core: The Sovereign Fleet (V2.5.7)
+# 🏛️ AOXC-Core: The Sovereign Fleet (V2.0.0)
 
 [![Network: X Layer](https://img.shields.io/badge/Network-X_Layer_Testnet-blueviolet?style=for-the-badge)](https://xlayer.okx.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](https://opensource.org/licenses/MIT)
@@ -48,7 +48,7 @@ The ecosystem is governed by a dual-layer authority structure to ensure maximum 
 ### 🛡️ Atomic Initialization Pattern
 To eliminate the "Uninitialized Implementation" attack vector, all modules employ `_disableInitializers()`. Deployment is strictly handled via an atomic transaction through the **ERC1967Proxy**, ensuring no third-party can hijack the logic layer during onboarding.
 
-### 🧬 "Citizen" Onboarding (Rule 2.5.7)
+### 🧬 "Citizen" Onboarding (Rule 2.0.0)
 The system has transitioned from passive registration to an **Active Onboarding (onboardMember)** model. Every module is treated as a "Citizen" with specific ACL permissions, allowing the **Sentinel** to surgically isolate compromised modules without affecting the entire fleet.
 
 ### 📦 ERC-7201 Namespaced Storage
