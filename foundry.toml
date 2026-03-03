@@ -9,47 +9,42 @@ test = "test"
 script = "script"
 
 # ==============================================================================
-# --- 🔗 REMAPPINGS (Path Resolution) ---
-# FIX: Removed trailing slashes to ensure maximum compiler compatibility.
+# --- 🔗 REMAPPINGS (Kısaltılmış & Modüler) ---
+# Artık importlar: "aoxc/core/AoxcCore.sol" şeklinde olacak.
 # ==============================================================================
 remappings = [
     "@openzeppelin/contracts=lib/openzeppelin-contracts/contracts",
     "@openzeppelin/contracts-upgradeable=lib/openzeppelin-contracts-upgradeable/contracts",
     "forge-std=lib/forge-std/src",
-    "aox-core=src",
-    "aox-test=test",
-    "aox-interfaces=src/interfaces",
-    "aox-libraries=src/libraries"
+    "aoxc=src",
+    "aoxc-core=src/core",
+    "aoxc-finance=src/finance",
+    "aoxc-infra=src/infra",
+    "aoxc-gov=src/gov",
+    "aoxc-test=test",
+    "aoxc-interfaces=src/interfaces",
+    "aoxc-libraries=src/libraries",
+    "aoxc-abstract=src/abstract"
 ]
 
 # ==============================================================================
-# --- 🧠 COMPILER STRATEGY (X-LAYER OPTIMIZED) ---
+# --- 🧠 COMPILER STRATEGY ---
 # ==============================================================================
 solc_version = "0.8.33"
 optimizer = true
 optimizer_runs = 200
-via_ir = true          # Required for complex Yul/EVM optimization.
-
-# X-LAYER COMPLIANCE: Targetting 'cancun' for mcopy and blob support.
-evm_version = "cancun"
+via_ir = true
 
 # ==============================================================================
 # --- 🛡️ SECURITY & OUTPUT ---
 # ==============================================================================
-bytecode_hash = "none" # Disabling metadata hash for deterministic builds.
-extra_output = ["abi", "storageLayout"] # Crucial for AOXStorage alignment checks.
+bytecode_hash = "none"
+extra_output = ["abi", "storageLayout"]
 
-# ==============================================================================
-# --- ⚡ TESTING (FUZZING) ---
-# ==============================================================================
 [fuzz]
 runs = 256
 
-# ==============================================================================
-# --- 🌐 INFRASTRUCTURE & NETWORK ---
-# ==============================================================================
 [rpc_endpoints]
-#xlayer_mainnet = "https://rpc.xlayer.tech"
 xlayer_testnet = "https://testrpc.xlayer.tech/terigon"
 
 [etherscan]
