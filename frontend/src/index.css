@@ -4,25 +4,31 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
-  /* User's Main Color: Lime (#C8FA01) replacing Cyan */
-  --color-cyan-500: #C8FA01;
+  /* AOXC Prime Lime Palette - Cyan'ın yerini aldı */
+  --color-primary: #C8FA01;
+  --color-primary-hover: #D4FC45;
+  --color-primary-dark: #1A2100;
+  
+  /* UI System Colors */
+  --color-cyan-500: #C8FA01; /* Geriye dönük uyumluluk için */
   --color-cyan-400: #D4FC45;
   --color-cyan-600: #A6D100;
-  --color-cyan-950: #1A2100;
-
-  /* Additional System Colors */
-  --color-purple-500: #A855F7;
-  --color-pink-500: #EC4899;
-  --color-blue-500: #3B82F6;
+  
+  /* Background Neutrals */
+  --color-bg-main: #050505;
 }
 
 @layer base {
   body {
-    @apply bg-[#050505] text-white antialiased overflow-hidden;
+    /* KRİTİK: overflow-hidden olmalı, dikey kaydırma MainLayout tarafından yönetilir */
+    @apply bg-bg-main text-white antialiased overflow-hidden;
     font-feature-settings: "ss01", "ss02", "cv01", "cv02";
+    cursor: default;
+    height: 100vh;
+    width: 100vw;
   }
 
-  /* Custom Scrollbar */
+  /* Custom Scrollbar - Siber Görünüm */
   ::-webkit-scrollbar {
     width: 4px;
     height: 4px;
@@ -31,23 +37,37 @@
     @apply bg-transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-white/10 rounded-full hover:bg-white/20 transition-colors;
+    @apply bg-white/10 rounded-full hover:bg-primary/20 transition-colors;
+  }
+
+  ::selection {
+    @apply bg-primary text-black;
   }
 }
 
 @layer components {
+  /* Satır geçişleri */
   .ledger-row {
-    @apply border-b border-white/5 hover:bg-white/[0.02] transition-colors;
+    @apply border-b border-white/5 hover:bg-white/[0.03] transition-all duration-200;
   }
   
-  .cyan-glow {
-    box-shadow: 0 0 20px rgba(200, 250, 1, 0.15);
+  /* Siber Parlama */
+  .aox-glow {
+    box-shadow: 0 0 20px rgba(200, 250, 1, 0.15), inset 0 0 5px rgba(200, 250, 1, 0.05);
+  }
+
+  /* AOXC Buton Sistemi */
+  .btn-primary {
+    @apply bg-primary text-black font-bold px-4 py-2 rounded uppercase tracking-tighter 
+           hover:bg-primary-hover active:scale-95 transition-all shadow-[0_0_15px_rgba(200,250,1,0.3)];
   }
 }
 
+/* Scanline: Ekranın üzerinden geçen tarama çizgisi */
 @keyframes scanline {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100%); }
+  0% { transform: translateY(-100%); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: translateY(100vh); opacity: 0; }
 }
 
 .scanline {
@@ -56,8 +76,19 @@
   left: 0;
   width: 100%;
   height: 2px;
-  background: rgba(200, 250, 1, 0.05);
+  background: linear-gradient(to bottom, transparent, rgba(200, 250, 1, 0.1), transparent);
   animation: scanline 8s linear infinite;
   pointer-events: none;
   z-index: 100;
+}
+
+/* CRT Overlay: Düşük opasiteli siber doku */
+.crt-overlay {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), 
+              linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+  background-size: 100% 3px, 3px 100%;
+  pointer-events: none;
+  z-index: 99;
 }

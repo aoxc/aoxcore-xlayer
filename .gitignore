@@ -1,18 +1,23 @@
+# 1. Ana dizine çık
+cd ~/Work/AOXCORE
+
+# 2. Varsa alt klasörlerdeki kalıntıları temizle (Çakışmayı önlemek için)
+rm -f backend/.gitignore frontend/.gitignore cli/.gitignore contracts/.gitignore
+
+# 3. Master .gitignore dosyasını oluştur (Verdiğin içeriği buraya yazıyoruz)
+cat <<EOF > .gitignore
 # ==============================================================================
 # 🧠 AOXCORE PROTOCOL | NEURAL ARCHITECTURE GIT SPEC
 # VERSION: 6.0.0 "Architect Edition" - Hybrid Protection
 # ==============================================================================
 
 # --- 🛠️ FOUNDRY & COMPILER (ROOT SPECIFIC) ---
-# Sadece ana dizindeki (root) derleme çıktılarını engeller.
 /out/
 /cache/
 /artifacts/
 foundry.lock
 
-# --- 📦 DEPENDENCIES & LIBRARIES (SURGICAL PRECISION) ---
-# KRİTİK: Genel "lib/" yasağı kaldırıldı. 
-# Sadece kök dizindeki kütüphaneleri (Submodules/Foundry) engeller.
+# --- 📦 DEPENDENCIES & LIBRARIES ---
 /lib/
 node_modules/
 dist/
@@ -22,8 +27,7 @@ build/
 !.yarn/patches/
 !.yarn/releases/
 
-# --- 🔐 SECRETS & NEURAL KEYS (ZERO TRUST) ---
-# .env dosyalarını ve anahtarları asla sızdırmaz.
+# --- 🔐 SECRETS & NEURAL KEYS ---
 .env
 .env.*
 !.env.example
@@ -34,7 +38,6 @@ secrets/
 .secret*
 
 # --- 📡 BLOCKCHAIN & SENTINEL DATA ---
-# Yayın kayıtları (Broadcast) temizliği
 broadcast/
 !broadcast/*/run-latest.json
 /broadcast/*/31337/
@@ -57,7 +60,7 @@ yarn-debug.log*
 pnpm-debug.log*
 panic.log
 
-# --- 💻 OS & IDE (PROFESSIONAL CLEANUP) ---
+# --- 💻 OS & IDE ---
 .DS_Store
 Thumbs.db
 .vscode/
@@ -69,7 +72,6 @@ Thumbs.db
 *.bak
 *.tmp
 *.temp
+EOF
 
-# ==============================================================================
-# 🌊 AOXCAN SECURITY - PROTOCOL ALIGNED
-# ==============================================================================
+echo "🛡️ Master-Shield .gitignore aktif edildi."

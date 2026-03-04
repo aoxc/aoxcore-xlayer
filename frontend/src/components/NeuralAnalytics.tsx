@@ -1,38 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  AreaChart, 
-  Area,
-  BarChart,
-  Bar
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, 
+  ResponsiveContainer, AreaChart, Area, BarChart, Bar 
 } from 'recharts';
 import { useAoxcStore } from '../store/useAoxcStore';
 import { useTranslation } from 'react-i18next';
-import { Activity, TrendingUp, Zap, Wallet, BarChart2, Clock } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Activity, TrendingUp, Zap, Wallet, BarChart2, Clock, RefreshCw, AlertCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
 
+/**
+ * @title Neural Analytics Engine v2.5
+ * @notice Real-time telemetry aggregator for X Layer blockchain & AOXCORE Protocol.
+ * @dev Integration: Recharts + Zustand for Forensic Visuals.
+ */
+
 export const NeuralAnalytics = () => {
-  const { analyticsData, gasEfficiency, networkLoad } = useAoxcStore();
+  const { analyticsData, gasEfficiency, networkLoad, blockNumber, networkStatus } = useAoxcStore();
   const { t } = useTranslation();
   const [timeRange, setTimeRange] = useState('1H');
+
+  // AUDIT: Filter data based on selected time range
+  const filteredData = useMemo(() => {
+    const now = Date.now() / 1000;
+    const ranges: Record<string, number> = { '1H': 3600, '24H': 86400, '7D': 604800, '30D': 2592000 };
+    return (analyticsData || []).filter(d => d.timestamp > (now - ranges[timeRange]));
+  }, [analyticsData, timeRange]);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-black/90 border border-white/10 p-3 rounded-xl backdrop-blur-md shadow-2xl z-50">
-          <p className="text-[10px] text-white/40 mb-2 font-mono">EPOCH: {label}</p>
+        <div className="bg-[#050505] border border-cyan-500/20 p-4 rounded-2xl backdrop-blur-xl shadow-2xl z-50">
+          <div className="flex items-center gap-2 mb-3 border-b border-white/5 pb-2">
+            <Clock size={10} className="text-cyan-500" />
+            <p className="text-[9px] text-white/40 font-mono uppercase tracking-widest">
+              Epoch: {new Date(label * 1000).toLocaleTimeString()}
+            </p>
+          </div>
           {payload.map((entry: any, index: number) => (
-            <div key={index} className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: entry.color }} />
-              <span className="text-[11px] font-bold text-white uppercase tracking-tight">
-                {entry.name}: {entry.value.toFixed(2)}
+            <div key={index} className="flex items-center justify-between gap-8 mb-1">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: entry.color }} />
+                <span className="text-[10px] font-mono text-white/60 uppercase">{entry.name}</span>
+              </div>
+              <span className="text-[11px] font-black text-white tabular-nums">
+                {entry.name === 'Treasury' ? `$${(entry.value / 1000).toFixed(1)}K` : entry.value.toFixed(2)}
               </span>
             </div>
           ))}
@@ -43,26 +55,37 @@ export const NeuralAnalytics = () => {
   };
 
   return (
-    <div className="flex-1 overflow-auto bg-[#0a0a0a] p-4 md:p-8 space-y-8 scrollbar-hide pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="flex flex-col">
-          <h2 className="text-cyan-400 font-mono text-[10px] font-bold uppercase tracking-[0.3em] mb-1">
-            {t('analytics.title', 'Neural Analytics Engine')}
-          </h2>
-          <span className="text-[8px] font-mono text-white/20 uppercase tracking-widest">Real-time XLayer-Reth Telemetry</span>
+    <div className="flex-1 overflow-auto bg-[#030303] p-6 md:p-10 space-y-10 scrollbar-hide pb-32 relative">
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-cyan-500/5 blur-[120px] rounded-full pointer-events-none" />
+
+      {/* Header Section */}
+      <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <h2 className="text-cyan-500 font-mono text-[11px] font-black uppercase tracking-[0.4em]">
+              {t('analytics.title', 'Neural_Analytics_Engine')}
+            </h2>
+            <div className={cn(
+              "flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[8px] font-bold uppercase",
+              networkStatus === 'healthy' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500 animate-pulse" : "bg-rose-500/10 border-rose-500/20 text-rose-500"
+            )}>
+              {networkStatus === 'healthy' ? 'Live_Uplink' : 'Degraded_Link'}
+            </div>
+          </div>
+          <p className="text-[9px] font-mono text-white/20 uppercase tracking-[0.2em]">
+            Block: <span className="text-white/60">#{blockNumber}</span> // Telemetry: <span className="text-cyan-500/60">{networkLoad}</span>
+          </p>
         </div>
 
-        {/* Time Range Selector */}
-        <div className="flex items-center bg-white/5 rounded-lg p-1 border border-white/10 self-start md:self-auto">
+        {/* Time Filter */}
+        <div className="flex items-center bg-white/[0.03] rounded-2xl p-1.5 border border-white/5 backdrop-blur-md">
           {['1H', '24H', '7D', '30D'].map((range) => (
             <button
               key={range}
               onClick={() => setTimeRange(range)}
               className={cn(
-                "px-3 py-1 rounded-md text-[10px] font-bold transition-all",
-                timeRange === range 
-                  ? "bg-cyan-500 text-black shadow-lg shadow-cyan-500/20" 
-                  : "text-white/40 hover:text-white hover:bg-white/5"
+                "px-5 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all",
+                timeRange === range ? "bg-cyan-500 text-black" : "text-white/30 hover:text-white"
               )}
             >
               {range}
@@ -71,156 +94,138 @@ export const NeuralAnalytics = () => {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+      {/* Primary Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
         <StatCard 
           icon={Zap} 
           label="Gas Efficiency" 
           value={`${gasEfficiency}%`} 
           trend="+2.4%" 
-          color="text-emerald-500" 
+          color="text-emerald-400" 
+          chartColor="#10b981"
+          data={filteredData.map(d => ({ v: d.gas }))}
         />
         <StatCard 
           icon={Activity} 
-          label="Network Latency" 
+          label="Network Load" 
           value={networkLoad} 
-          trend="-0.1ms" 
-          color="text-cyan-500" 
+          trend="-0.2ms" 
+          color="text-cyan-400"
+          chartColor="#06b6d4"
+          data={filteredData.map(d => ({ v: parseFloat(d.load) || 0 }))}
         />
         <StatCard 
           icon={Wallet} 
-          label="Treasury Balance" 
-          value={`$${(analyticsData[analyticsData.length - 1]?.treasury / 1000000).toFixed(2)}M`} 
-          trend="+12K" 
-          color="text-purple-500" 
+          label="Treasury Net" 
+          value={`$${((analyticsData?.[analyticsData.length - 1]?.treasury || 0) / 1000).toFixed(1)}K`} 
+          trend="+$1.2K" 
+          color="text-purple-400"
+          chartColor="#a855f7"
+          data={filteredData.map(d => ({ v: d.treasury }))}
         />
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-        {/* Gas & Load Chart */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-[2rem] p-6 md:p-8 relative overflow-hidden group">
-          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-8 flex items-center gap-2">
-            <TrendingUp size={12} className="text-cyan-500" />
-            Network Performance
-          </h3>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={analyticsData}>
-                <defs>
-                  <linearGradient id="colorGas" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorLoad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                <XAxis dataKey="timestamp" hide />
-                <YAxis hide domain={['auto', 'auto']} />
-                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#ffffff10', strokeWidth: 1 }} />
-                <Area 
-                  type="monotone" 
-                  dataKey="gas" 
-                  name="Gas"
-                  stroke="#10b981" 
-                  fillOpacity={1} 
-                  fill="url(#colorGas)" 
-                  strokeWidth={2}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="load" 
-                  name="Load"
-                  stroke="#06b6d4" 
-                  fillOpacity={1} 
-                  fill="url(#colorLoad)" 
-                  strokeWidth={2}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+      
 
-        {/* Treasury Chart */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-[2rem] p-6 md:p-8 relative overflow-hidden group">
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-8 flex items-center gap-2">
-            <Wallet size={12} className="text-purple-500" />
-            Treasury Growth
-          </h3>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={analyticsData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                <XAxis dataKey="timestamp" hide />
-                <YAxis hide domain={['auto', 'auto']} />
-                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#ffffff10', strokeWidth: 1 }} />
-                <Line 
-                  type="stepAfter" 
-                  dataKey="treasury" 
-                  name="Treasury"
-                  stroke="#a855f7" 
-                  strokeWidth={3} 
-                  dot={false}
-                  animationDuration={1000}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+      {/* Visualization Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 relative z-10">
+        <ChartContainer title="Performance Matrix" icon={TrendingUp} accent="cyan">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={filteredData}>
+              <defs>
+                <linearGradient id="colorGas" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+              <XAxis dataKey="timestamp" hide />
+              <YAxis hide domain={['dataMin - 5', 'dataMax + 5']} />
+              <Tooltip content={<CustomTooltip />} />
+              <Area 
+                type="monotone" 
+                dataKey="gas" 
+                stroke="#10b981" 
+                fill="url(#colorGas)" 
+                strokeWidth={3}
+                animationDuration={1500}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </ChartContainer>
 
-        {/* Transaction Volume Bar Chart (New) */}
-        <div className="col-span-1 lg:col-span-2 bg-white/[0.02] border border-white/5 rounded-[2rem] p-6 md:p-8 relative overflow-hidden group">
-          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-8 flex items-center gap-2">
-            <BarChart2 size={12} className="text-amber-500" />
-            Transaction Volume (TPS)
-          </h3>
-          <div className="h-48 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={analyticsData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                <XAxis dataKey="timestamp" hide />
-                <YAxis hide />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#ffffff05' }} />
-                <Bar 
-                  dataKey="gas" 
-                  name="TPS" 
-                  fill="#f59e0b" 
-                  radius={[4, 4, 0, 0]} 
-                  barSize={20}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <ChartContainer title="Treasury Capital Flux" icon={Wallet} accent="purple">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={filteredData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+              <XAxis dataKey="timestamp" hide />
+              <YAxis hide domain={['auto', 'auto']} />
+              <Tooltip content={<CustomTooltip />} />
+              <Line 
+                type="stepAfter" 
+                dataKey="treasury" 
+                stroke="#a855f7" 
+                strokeWidth={4} 
+                dot={false}
+                isAnimationActive={true}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartContainer>
       </div>
     </div>
   );
 };
 
-const StatCard = ({ icon: Icon, label, value, trend, color }: any) => (
+// --- Atomic Helper Components ---
+
+const StatCard = ({ icon: Icon, label, value, trend, color, data, chartColor }: any) => (
   <motion.div 
-    whileHover={{ y: -4 }}
-    className="bg-white/[0.03] border border-white/10 p-6 rounded-3xl relative overflow-hidden group"
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="bg-[#0a0a0a] border border-white/5 p-8 rounded-[2.5rem] relative overflow-hidden group transition-all hover:border-white/10"
   >
-    <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-    <div className="flex items-start justify-between relative z-10">
-      <div className="flex flex-col">
-        <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest mb-2">{label}</span>
-        <span className={cn("text-2xl font-bold tracking-tighter tabular-nums", color)}>{value}</span>
+    <div className="flex justify-between items-start relative z-10 mb-6">
+      <div className="space-y-1">
+        <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">{label}</span>
+        <h4 className={cn("text-3xl font-black tracking-tighter tabular-nums", color)}>{value}</h4>
       </div>
-      <div className={cn("p-3 rounded-2xl bg-white/5", color.replace('text-', 'text-opacity-20 bg-'))}>
+      <div className={cn("p-4 rounded-2xl bg-white/[0.03] border border-white/5 shadow-inner", color)}>
         <Icon size={20} />
       </div>
     </div>
-    <div className="mt-4 flex items-center gap-2 relative z-10">
-      <span className="text-[10px] font-bold text-emerald-500">{trend}</span>
-      <span className="text-[8px] text-white/20 uppercase tracking-widest">vs last epoch</span>
+
+    <div className="flex items-center gap-3 relative z-10">
+      <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-lg">{trend}</span>
+      <span className="text-[8px] text-white/20 uppercase tracking-widest font-mono italic">Audit_Verified</span>
+    </div>
+
+    {/* Sparkline simulation */}
+    <div className="absolute bottom-0 left-0 right-0 h-16 opacity-10 group-hover:opacity-30 transition-opacity">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data}>
+          <Area type="monotone" dataKey="v" stroke={chartColor} fill={chartColor} strokeWidth={2} dot={false} />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   </motion.div>
+);
+
+const ChartContainer = ({ title, icon: Icon, children, accent, height = "h-72" }: any) => (
+  <div className="bg-[#080808] border border-white/5 rounded-[2.5rem] p-8 relative overflow-hidden group">
+    <div className="flex items-center justify-between mb-10 relative z-10">
+      <div className="flex items-center gap-3">
+        <div className={cn(
+          "p-2 rounded-lg bg-white/5 border border-white/5",
+          accent === 'cyan' ? "text-cyan-500" : accent === 'purple' ? "text-purple-500" : "text-amber-500"
+        )}>
+          <Icon size={14} />
+        </div>
+        <h3 className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">{title}</h3>
+      </div>
+    </div>
+    <div className={cn("w-full relative z-10", height)}>
+      {children}
+    </div>
+  </div>
 );

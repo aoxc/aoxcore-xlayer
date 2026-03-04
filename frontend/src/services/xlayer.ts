@@ -1,116 +1,55 @@
-import { createPublicClient, http, defineChain, formatEther, parseAbiItem } from 'viem';
+/**
+ * @notice İşlemi tam kapsamlı simüle eder.
+ * @dev Hem gas tahmini hem de mantıksal doğrulama (Static Call) yapar.
+ */
+export const simulateTransaction = async (to: string, data: string, value: bigint) => {
+  return await throttleRequest(async () => {
+    try {
+      // Paralel çalıştırma: Hem gas tahmini hem de statik çağrı aynı anda yapılır
+      const [gasEstimate, _] = await Promise.all([
+        getProvider().estimateGas({ to, data, value }),
+        getProvider().call({ to, data, value })
+      ]);
 
-export const xlayerTestnet = defineChain({
-  id: 1952,
-  name: 'XLayer Testnet',
-  network: 'xlayer-testnet',
-  nativeCurrency: {
-    decimals: 18,
-    name: 'OKB',
-    symbol: 'OKB',
-  },
-  rpcUrls: {
-    default: {
-      http: ['https://testrpc.xlayer.tech/terigon'],
-    },
-    public: {
-      http: ['https://testrpc.xlayer.tech/terigon'],
-    },
-  },
-  blockExplorers: {
-    default: { name: 'OKLink', url: 'https://www.oklink.com/xlayer-test' },
-  },
-});
+      return { 
+        success: true, 
+        gasEstimate: gasEstimate.toString(),
+        risk: "CLEAN",
+        timestamp: Date.now()
+      };
+    } catch (error: any) {
+      // Hata mesajını insan diline çevir ve temizle
+      let errorMsg = "Transaction Simulation Failed";
+      
+      if (error.reason) errorMsg = error.reason;
+      else if (error.message?.includes("insufficient funds")) errorMsg = "Yetersiz OKB Bakiyesi";
+      else if (error.data) errorMsg = `Contract Error: ${error.data.slice(0, 10)}`; // İlk 4 byte hata kodu
 
-export const publicClient = createPublicClient({
-  chain: xlayerTestnet,
-  transport: http(),
-});
-
-export const getBlockNumber = async () => {
-  try {
-    return await publicClient.getBlockNumber();
-  } catch (error) {
-    console.error("XLayer RPC Error (getBlockNumber):", error);
-    return null;
-  }
+      return { 
+        success: false, 
+        error: errorMsg,
+        risk: "HIGH",
+        timestamp: Date.now()
+      };
+    }
+  });
 };
 
-export const getGasPrice = async () => {
-  try {
-    return await publicClient.getGasPrice();
-  } catch (error) {
-    console.error("XLayer RPC Error (getGasPrice):", error);
-    return null;
-  }
-};
-
-export const getBalance = async (address: `0x${string}`) => {
-  try {
-    const balance = await publicClient.getBalance({ address });
-    return formatEther(balance);
-  } catch (error) {
-    console.error("XLayer RPC Error (getBalance):", error);
-    return null;
-  }
-};
-
-export const getLogs = async (address: `0x${string}`, fromBlock?: bigint) => {
-  try {
-    return await publicClient.getLogs({
-      address,
-      fromBlock: fromBlock || 'earliest',
-      toBlock: 'latest'
-    });
-  } catch (error) {
-    console.error("XLayer RPC Error (getLogs):", error);
-    return [];
-  }
-};
-
-// Simulation for Gemini
-export const simulateTransaction = async (to: `0x${string}`, data: `0x${string}`, value: bigint = 0n) => {
-  try {
-    const gasEstimate = await publicClient.estimateGas({
-      account: '0x0000000000000000000000000000000000000000', // Simulation account
-      to,
-      data,
-      value
-    });
-    
-    const result = await publicClient.call({
-      to,
-      data,
-      value
-    });
-
-    return {
-      success: true,
-      gasEstimate: gasEstimate.toString(),
-      result: result.data
-    };
-  } catch (error: any) {
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-};
-
-// Debug Trace (Mocked if not supported by public RPC, but attempting structure)
-export const debugTrace = async (txHash: string) => {
-  // Note: Public RPCs usually disable debug_traceTransaction. 
-  // We will try to fetch receipt as a proxy for "debugging" status.
-  try {
-    const receipt = await publicClient.getTransactionReceipt({ hash: txHash as `0x${string}` });
-    return {
-      status: receipt.status,
-      gasUsed: receipt.gasUsed.toString(),
-      logs: receipt.logs,
-      effectiveGasPrice: receipt.effectiveGasPrice.toString()
-    };
-  } catch (error) {
-    console.error("XLayer RPC Error (debugTrace):", error);
-    return null;
-  }
+/**
+ * @notice AOXC Prime Asset bakiyesi (Hata durumunda null döner, 0 değil).
+ */
+export const getAoxcBalance = async (address: string): Promise<string | null> => {
+  if (!ethers.isAddress(address)) return "0.00";
+  
+  return await throttleRequest(async () => {
+    try {
+      const contract = new Contract(AOXC_TOKEN_ADDRESS, ERC20_ABI, getProvider());
+      const balance = await contract.balanceOf(address);
+      // AOXC token 18 decimal ise formatUnits(balance, 18)
+      return ethers.formatUnits(balance, 18); 
+    } catch (e) {
+      console.error("CRITICAL_RPC_ERROR: AOXC balance fetch failed.");
+      return null; // 0.00 yerine null dönmek, ağ hatasını UI'da göstermeni sağlar
+    }
+  });
 };

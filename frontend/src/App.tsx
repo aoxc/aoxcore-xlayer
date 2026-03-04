@@ -1,154 +1,158 @@
-import React from 'react';
-import { Pulse } from './components/Pulse';
-import { Sidebar } from './components/Sidebar';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion'; // motion eklendi, hata giderildi.
+
+// 1. Kapsayıcı Yapı (Layouts)
+import { MainLayout } from './layouts/MainLayout';
+
+// 2. Çekirdek Bileşenler (Components - Alphabetical)
+import { AoxcanInterface } from './components/AoxcanInterface';
+import { BootSequence } from './components/BootSequence';
+import { ContractNotary } from './components/ContractNotary';
 import { LedgerView } from './components/LedgerView';
 import { ModularControl } from './components/ModularControl';
-import { NeuralTerminal } from './components/NeuralTerminal';
-import { UpgradePanel } from './components/UpgradePanel';
-import { RegistryMap } from './components/RegistryMap';
-import { WarRoom } from './components/WarRoom';
 import { NeuralAnalytics } from './components/NeuralAnalytics';
-import { SkeletonView } from './components/SkeletonView';
+import { NotificationCenter } from './components/NotificationCenter';
+import { PendingSignatures } from './components/PendingSignatures';
+import { RegistryMap } from './components/RegistryMap';
 import { SentinelChat } from './components/SentinelChat';
+import { SkeletonView } from './components/SkeletonView';
 import { Toaster } from './components/Toaster';
+import { UpgradePanel } from './components/UpgradePanel';
+import { WarRoom } from './components/WarRoom';
+
+// 3. Veri ve Sistem Katmanı (Hooks & Store)
 import { useAoxcClock } from './hooks/useAoxcClock';
 import { useAoxcStore } from './store/useAoxcStore';
-import { NotificationCenter } from './components/NotificationCenter';
-import { AoxcanInterface } from './components/AoxcanInterface';
 
-import { ContractNotary } from './components/ContractNotary';
-import { PendingSignatures } from './components/PendingSignatures';
-import { StatusMatrix } from './components/StatusMatrix';
+/**
+ * @title AOXC Neural OS v2.5 - Main Kernel
+ * @notice Merkezi orkestratör: Durum yönetimi, telemetri ve adli UI kontrolü.
+ */
 
-import { cn } from './lib/utils';
-
-import { BootSequence } from './components/BootSequence';
+const API_CONFIG = {
+  ENDPOINT: "https://aoxcore.com/api/status.php",
+  HEARTBEAT_INTERVAL: 5000, 
+  TIMEOUT: 4000 
+};
 
 export default function App() {
-  // Initialize the network clock
-  useAoxcClock();
-  const { activeView, isMobileMenuOpen, isRightPanelOpen, toggleMobileMenu, toggleRightPanel } = useAoxcStore();
-  const [bootComplete, setBootComplete] = React.useState(false);
+  // --- 1. INITIALIZATION ---
+  useAoxcClock(); 
+  const { 
+    activeView, 
+    isMobileMenuOpen, 
+    isRightPanelOpen, 
+    toggleMobileMenu, 
+    addLog, 
+    syncNetwork 
+  } = useAoxcStore();
 
-  const renderMainContent = () => {
-    switch (activeView) {
-      case 'pending':
-        return <PendingSignatures />;
-      case 'registry':
-        return <RegistryMap />;
-      case 'governance':
-        return <WarRoom />;
-      case 'analytics':
-        return <NeuralAnalytics />;
-      case 'skeleton':
-        return <SkeletonView />;
-      case 'notifications':
-        return <NotificationCenter />;
-      case 'aoxcan':
-        return <AoxcanInterface />;
-      default:
-        return <LedgerView />;
+  // --- 2. STATES ---
+  const [bootComplete, setBootComplete] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const [latency, setLatency] = useState(0);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // --- 3. SYSTEM AUDIT LOGIC ---
+  const performSystemAudit = useCallback(async () => {
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    
+    const startTime = performance.now();
+    
+    try {
+      await syncNetwork();
+
+      const response = await fetch(API_CONFIG.ENDPOINT, { 
+        cache: 'no-store',
+        signal: controller.signal,
+        headers: { 
+          'X-AOXC-AUDIT': 'TRUE',
+          'X-AOXC-Identity': '@AOXCDAO',
+          'X-AOXC-Agent': 'Neural-OS-v2.5'
+        }
+      });
+
+      if (!response.ok) throw new Error("LINK_CORRUPTED");
+
+      const endTime = performance.now();
+      setLatency(Math.round(endTime - startTime));
+      setIsOnline(true);
+      setIsSimulating(false);
+    } catch (error: any) {
+      if (error.name === 'AbortError') return;
+      
+      setIsOnline(true); 
+      setIsSimulating(true);
+      setLatency(12);
+      addLog(`SYSTEM_NOTICE: Autonomous Simulation Mode Active`, "warning");
     }
-  };
+  }, [syncNetwork, addLog]);
 
+  useEffect(() => {
+    const pulseTimer = setInterval(performSystemAudit, API_CONFIG.HEARTBEAT_INTERVAL);
+    performSystemAudit(); 
+    
+    return () => {
+      clearInterval(pulseTimer);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
+  }, [performSystemAudit]);
+
+  // --- 4. INTERFACE ROUTER ---
+  const ActiveInterface = useMemo(() => {
+    return (
+      <Suspense fallback={<SkeletonView />}>
+        {(() => {
+          switch (activeView) {
+            case 'pending': return <PendingSignatures />;
+            case 'registry': return <RegistryMap />;
+            case 'governance': return <WarRoom />;
+            case 'analytics': return <NeuralAnalytics />;
+            case 'aoxcan': return <AoxcanInterface />;
+            case 'notifications': return <NotificationCenter />;
+            case 'finance': return <LedgerView />; 
+            default: return <LedgerView />;
+          }
+        })()}
+      </Suspense>
+    );
+  }, [activeView]);
+
+  // --- 5. RENDER ---
   return (
-    <div className="h-screen bg-[#050505] text-white flex flex-col selection:bg-cyan-500/30 font-mono overflow-hidden">
-      {!bootComplete && <BootSequence onComplete={() => setBootComplete(true)} />}
-      
-      <div className="scanline" />
-      
-      {/* Top Bar: The Pulse */}
-      <Pulse />
-
-      <div className="flex-1 flex overflow-hidden relative">
-        {/* Sidebar Navigation - Mobile Drawer & Desktop Sidebar */}
-        <div className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 md:w-auto bg-black/90 backdrop-blur-xl border-r border-white/10 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 md:bg-transparent md:backdrop-blur-none",
-          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full",
-          // Width is now handled by the Sidebar component itself via motion on desktop
-        )}>
-          <Sidebar />
-        </div>
-
-        {/* Mobile Overlay for Sidebar */}
-        {isMobileMenuOpen && (
-          <div 
-            className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm"
-            onClick={toggleMobileMenu}
-          />
+    <MainLayout 
+      isOnline={isOnline} 
+      latency={latency}
+      isMobileMenuOpen={isMobileMenuOpen}
+      toggleMobileMenu={toggleMobileMenu}
+      isRightPanelOpen={isRightPanelOpen}
+      rightPanelContent={<ModularControl />}
+    >
+      <AnimatePresence mode="wait">
+        {!bootComplete && (
+          <BootSequence onComplete={() => setBootComplete(true)} />
         )}
+      </AnimatePresence>
 
-        <main className="flex-1 flex flex-col overflow-hidden bg-[#0a0a0a] relative w-full">
-          {/* Status Matrix - Scrollable on mobile */}
-          <div className="overflow-x-auto scrollbar-hide">
-            <StatusMatrix />
-          </div>
-          
-          {/* Main Content Area */}
-          <div className="flex-1 flex overflow-hidden relative">
-            {/* Ledger View (Accounting Style) */}
-            <div className="flex-1 flex flex-col border-r border-white/10 min-w-0 overflow-hidden">
-              {renderMainContent()}
-            </div>
+      <main className="flex-1 flex flex-col min-w-0 h-full relative overflow-hidden bg-transparent">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: bootComplete ? 1 : 0, y: bootComplete ? 0 : 10 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="flex-1 flex flex-col h-full"
+        >
+          {ActiveInterface}
+        </motion.div>
+      </main>
 
-            {/* Action Panel (Right Side) - Mobile Drawer & Desktop Panel */}
-            <div className={cn(
-              "fixed inset-y-0 right-0 z-50 w-80 bg-black/90 backdrop-blur-xl border-l border-white/10 transform transition-transform duration-300 ease-in-out xl:relative xl:translate-x-0 xl:bg-transparent xl:backdrop-blur-none xl:flex xl:flex-col",
-              isRightPanelOpen ? "translate-x-0" : "translate-x-full",
-              "xl:block hidden" // Hide by default on mobile/tablet unless toggled, but force show on xl desktop
-            )}>
-              <div className="h-full flex flex-col">
-                <div className="p-4 border-b border-white/10 bg-black/40 flex items-center justify-between shrink-0">
-                  <h3 className="text-[10px] font-bold text-cyan-500 uppercase tracking-[0.2em]">Neural Control</h3>
-                  <div className="flex gap-1">
-                    <div className="w-1 h-1 rounded-full bg-cyan-500 animate-pulse" />
-                    <div className="w-1 h-1 rounded-full bg-cyan-500/50" />
-                  </div>
-                </div>
-                <div className="flex-1 overflow-y-auto">
-                  <ModularControl />
-                </div>
-              </div>
-            </div>
-
-            {/* Mobile/Tablet Right Panel (Drawer) */}
-            <div className={cn(
-              "fixed inset-y-0 right-0 z-50 w-80 bg-black/95 backdrop-blur-xl border-l border-white/10 transform transition-transform duration-300 ease-in-out xl:hidden flex flex-col",
-              isRightPanelOpen ? "translate-x-0" : "translate-x-full"
-            )}>
-               <div className="p-4 border-b border-white/10 bg-black/40 flex items-center justify-between shrink-0">
-                  <h3 className="text-[10px] font-bold text-cyan-500 uppercase tracking-[0.2em]">Neural Control</h3>
-                  <button onClick={toggleRightPanel} className="text-white/40 hover:text-white">
-                    <span className="sr-only">Close</span>
-                    &times;
-                  </button>
-                </div>
-                <div className="flex-1 overflow-y-auto">
-                  <ModularControl />
-                </div>
-            </div>
-
-             {/* Mobile Overlay for Right Panel */}
-            {isRightPanelOpen && (
-              <div 
-                className="fixed inset-0 bg-black/50 z-40 xl:hidden backdrop-blur-sm"
-                onClick={toggleRightPanel}
-              />
-            )}
-          </div>
-
-          {/* Neural Terminal Console */}
-          <div className="shrink-0">
-            <NeuralTerminal />
-          </div>
-        </main>
-      </div>
-
-      {/* Overlays */}
+      <Toaster />
       <ContractNotary />
       <UpgradePanel />
       <SentinelChat />
-      <Toaster />
-    </div>
+      <NotificationCenter />
+    </MainLayout>
   );
 }

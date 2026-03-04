@@ -1,11 +1,34 @@
 import React from 'react';
 import { useAoxcStore } from '../store/useAoxcStore';
-import { motion } from 'motion/react';
-import { Activity, Cpu, Clock, Shield, Globe, Menu, PanelRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Activity, Cpu, Clock, Shield, Globe, Menu, PanelRight, Zap } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { cn } from '../lib/utils';
 
-export const Pulse = () => {
-  const { blockNumber, epochTime, toggleMobileMenu, toggleRightPanel } = useAoxcStore();
+/**
+ * @title AOXC Pulse: Neural Telemetry Bar
+ * @notice Real-time synchronization display for X Layer blockchain and AI state.
+ * @dev Audit Standards: 
+ * - Explicit Prop Interfaces to resolve TS2322.
+ * - Reactive Network Load indicators via Zustand.
+ */
+
+// FIX: TS2322 hatasını önlemek için App.tsx'den gelen propları tanımlıyoruz
+interface PulseProps {
+  isOnline?: boolean;
+  latency?: number;
+}
+
+export const Pulse = ({ isOnline = true, latency = 0 }: PulseProps) => {
+  const { 
+    blockNumber, 
+    epochTime, 
+    networkLoad, 
+    networkStatus,
+    toggleMobileMenu, 
+    toggleRightPanel 
+  } = useAoxcStore();
+  
   const { t, i18n } = useTranslation();
 
   const toggleLanguage = () => {
@@ -14,97 +37,126 @@ export const Pulse = () => {
   };
 
   return (
-    <div className="h-16 border-b border-white/10 bg-black/60 backdrop-blur-xl flex items-center justify-between px-6 relative overflow-hidden">
-      {/* Background Glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-full bg-cyan-500/5 blur-3xl pointer-events-none" />
+    <div className="h-16 border-b border-white/5 bg-[#030303]/80 backdrop-blur-2xl flex items-center justify-between px-6 relative overflow-hidden z-[100]">
+      {/* Visual Identity: Neural link aura */}
+      <div className="absolute top-0 left-1/4 w-1/2 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent pointer-events-none" />
       
-      <div className="flex items-center gap-4 md:gap-8 relative z-10">
+      {/* LEFT: Branding and Core Metadata */}
+      <div className="flex items-center gap-4 md:gap-10 relative z-10">
         <button 
           onClick={toggleMobileMenu}
-          className="md:hidden p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+          className="md:hidden p-2.5 bg-white/5 text-white/60 hover:text-cyan-400 rounded-xl transition-all"
         >
-          <Menu size={20} />
+          <Menu size={18} />
         </button>
 
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="min-w-0 flex flex-col">
-            <div className="flex items-center gap-2">
-              <h1 className="text-white font-mono font-bold tracking-tighter text-lg leading-none uppercase whitespace-nowrap overflow-hidden text-ellipsis">AOXC OS</h1>
-              <span className="px-1.5 py-0.5 bg-cyan-500/10 border border-cyan-500/20 rounded text-[8px] text-cyan-400 font-bold tracking-widest flex-shrink-0">V2.0</span>
+        <div className="flex flex-col">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-white font-mono font-black tracking-tighter text-xl leading-none uppercase italic group cursor-default">
+              AOXC<span className="text-cyan-500 group-hover:animate-pulse">OS</span>
+            </h1>
+            <div className="px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/20 rounded-md text-[8px] text-cyan-400 font-black tracking-widest uppercase">
+              L2_RETH_X1
             </div>
-            <p className="text-white/20 text-[9px] font-mono uppercase tracking-[0.2em] whitespace-nowrap overflow-hidden text-ellipsis mt-1">
-              Neural Governance Engine
-            </p>
           </div>
+          <p className="text-white/20 text-[9px] font-mono uppercase tracking-[0.3em] font-bold mt-1.5">
+            Neural Infrastructure
+          </p>
         </div>
 
-        <div className="hidden md:block h-8 w-px bg-white/10" />
+        <div className="hidden lg:block h-8 w-px bg-white/5" />
 
-        <div className="hidden md:flex items-center gap-6 font-mono">
-          <div className="flex flex-col">
-            <span className="text-[9px] text-white/40 uppercase tracking-widest">Block Height</span>
-            <motion.span 
-              key={blockNumber}
-              initial={{ opacity: 0, y: -5 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-cyan-400 font-bold text-sm tabular-nums"
-            >
-              #{blockNumber.toLocaleString()}
-            </motion.span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-[9px] text-white/40 uppercase tracking-widest">Network Load</span>
-            <div className="flex items-center gap-2">
-              <Activity size={10} className="text-blue-500" />
-              <span className="text-white font-bold text-sm tabular-nums">1.2ms</span>
-            </div>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-[9px] text-white/40 uppercase tracking-widest">AI Sentinel</span>
-            <div className="flex items-center gap-2">
-              <Shield size={10} className="text-purple-500" />
-              <span className="text-white font-bold text-sm uppercase tracking-tighter">Active</span>
-            </div>
-          </div>
+        {/* Real-time Telemetry Grid */}
+        <div className="hidden md:flex items-center gap-10 font-mono">
+          <TelemetryItem 
+            label="Block Height" 
+            value={`#${blockNumber.toLocaleString()}`} 
+            color="text-cyan-400"
+            animateKey={blockNumber}
+          />
+          <TelemetryItem 
+            label="Network Load" 
+            value={networkLoad || `${latency}ms`} 
+            icon={<Activity size={10} className="text-blue-500" />}
+          />
+          <TelemetryItem 
+            label="AI Sentinel" 
+            value={isOnline && networkStatus === 'healthy' ? "ACTIVE" : "RECOVERING"} 
+            icon={<Shield size={10} className={isOnline && networkStatus === 'healthy' ? "text-purple-500" : "text-amber-500"} />}
+          />
         </div>
       </div>
 
-        <div className="flex items-center gap-2 md:gap-6 relative z-10">
-        {/* Language Switcher */}
-        <button 
-          onClick={toggleLanguage}
-          className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-all group"
-        >
-          <Globe size={12} className="text-cyan-500 group-hover:rotate-180 transition-transform duration-500" />
-          <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest">{i18n.language === 'en' ? 'TR' : 'EN'}</span>
-        </button>
+      {/* RIGHT: Controls and Time Epoch */}
+      <div className="flex items-center gap-3 md:gap-8 relative z-10">
+        
+        {/* Language & UI Control Group */}
+        <div className="flex items-center gap-2 bg-white/5 p-1 rounded-2xl border border-white/5">
+          <button 
+            onClick={toggleLanguage}
+            className="flex items-center gap-2 px-4 py-2 bg-black/40 hover:bg-cyan-500 hover:text-black rounded-xl transition-all group"
+          >
+            <Globe size={12} className="group-hover:rotate-90 transition-transform duration-500" />
+            <span className="text-[10px] font-black uppercase tracking-widest">
+              {i18n.language.toUpperCase()}
+            </span>
+          </button>
+          
+          <button 
+            onClick={toggleRightPanel}
+            className="p-2 text-white/40 hover:text-white hover:bg-white/5 rounded-xl transition-all"
+            title="Toggle Notification Panel"
+          >
+            <PanelRight size={18} />
+          </button>
+        </div>
 
-        <button 
-          onClick={toggleRightPanel}
-          className="md:hidden p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-        >
-          <PanelRight size={20} />
-        </button>
-
-        <div className="hidden md:flex flex-col items-end font-mono">
-          <span className="text-[9px] text-white/40 uppercase tracking-widest">Blockchain Epoch Time</span>
-          <div className="flex items-center gap-2 text-cyan-400 font-bold tabular-nums">
-            <Clock size={12} />
-            <motion.span
-              key={epochTime}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              {epochTime}
-            </motion.span>
+        {/* Global Epoch Display */}
+        <div className="hidden sm:flex flex-col items-end font-mono">
+          <span className="text-[9px] text-white/20 uppercase tracking-widest font-bold">Protocol Epoch</span>
+          <div className="flex items-center gap-2.5 text-cyan-500/80 font-black tabular-nums text-sm">
+            <Clock size={12} className="text-white/20" />
+            <AnimatePresence mode="wait">
+              <motion.span
+                key={epochTime}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+              >
+                {epochTime}
+              </motion.span>
+            </AnimatePresence>
           </div>
         </div>
-        <div className="hidden md:block h-8 w-px bg-white/10" />
-        <div className="hidden md:flex items-center gap-2">
-          <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse shadow-[0_0_10px_#06b6d4]" />
-          <span className="text-xs text-cyan-500 font-mono font-bold tracking-widest">SYNCED</span>
+
+        {/* Sync Status Glow */}
+        <div className="hidden lg:flex items-center gap-3 px-4 py-2 bg-cyan-500/5 border border-cyan-500/10 rounded-2xl">
+          <div className={cn(
+            "w-2 h-2 rounded-full shadow-[0_0_12px_currentColor]",
+            isOnline && networkStatus === 'healthy' ? "text-cyan-500 bg-cyan-500 animate-pulse" : "text-rose-500 bg-rose-500"
+          )} />
+          <span className="text-[10px] text-cyan-500 font-mono font-black tracking-[0.2em]">
+            {isOnline && networkStatus === 'healthy' ? 'UPLINK_STABLE' : 'LINK_DEGRADED'}
+          </span>
         </div>
       </div>
     </div>
   );
 };
+
+// --- Atomic Helper Component ---
+const TelemetryItem = ({ label, value, icon, color = "text-white/70", animateKey }: any) => (
+  <div className="flex flex-col">
+    <span className="text-[8px] text-white/30 uppercase tracking-[0.2em] font-bold mb-1">{label}</span>
+    <div className="flex items-center gap-2">
+      {icon}
+      <motion.span 
+        key={animateKey}
+        initial={animateKey ? { opacity: 0.5, y: 2 } : {}}
+        animate={animateKey ? { opacity: 1, y: 0 } : {}}
+        className={cn("text-xs font-black tracking-tighter tabular-nums", color)}
+      >
+        {value}
+      </motion.span>
+    </div>
+  </div>
+);

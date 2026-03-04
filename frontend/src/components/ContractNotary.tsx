@@ -1,178 +1,245 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAoxcStore } from '../store/useAoxcStore';
-import { motion, AnimatePresence } from 'motion/react';
-import { Shield, FileText, CheckCircle, X, ArrowRight, Activity, Lock } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Shield, FileText, X, ArrowRight, Activity, 
+  Lock, AlertTriangle, Cpu, RefreshCw 
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../lib/utils';
+import { analyzeTransaction } from '../services/aiBridge';
 
+/**
+ * @title AOXC Contract Notary (Forensic Hub)
+ * @notice Final verification layer using AI Simulation before on-chain commitment.
+ * @dev Integration: X Layer (EVM) + Gemini 1.5 Flash.
+ */
 export const ContractNotary = () => {
-  const { activeNotary, setActiveNotary, addLedgerEntry, addLog, addPendingTx, blockNumber } = useAoxcStore();
-  const [isSigning, setIsSigning] = useState(false);
+  const { 
+    activeNotary, 
+    setActiveNotary, 
+    addLog, 
+    blockNumber,
+    networkStatus,
+    addNotification
+  } = useAoxcStore() as any; // Casting to any if interfaces are still evolving
+  
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [aiVerdict, setAiVerdict] = useState<any>(null);
   const { t } = useTranslation();
+
+  // İşlem detaylarını AI ile simüle et (Bileşen mount olduğunda başlar)
+  useEffect(() => {
+    const runSimulation = async () => {
+      if (activeNotary && !aiVerdict) {
+        try {
+          const result = await analyzeTransaction({
+            to: activeNotary.target || "0x",
+            data: activeNotary.details?.calldata || "0x",
+            value: activeNotary.details?.value || "0"
+          });
+          setAiVerdict(result);
+        } catch (error) {
+          console.error("SIMULATION_FAULT:", error);
+        }
+      }
+    };
+    runSimulation();
+  }, [activeNotary, aiVerdict]);
 
   if (!activeNotary) return null;
 
+  /**
+   * @notice Final Authorization Handler
+   * @dev Routes transaction to either DAO Multi-sig or direct Execution.
+   */
   const handleConfirm = async () => {
-    setIsSigning(true);
+    setIsProcessing(true);
     
-    // Simulate physical signature delay
-    setTimeout(() => {
-      const isMultiSig = activeNotary.operation.includes('Governance') || activeNotary.operation.includes('Vault');
-      
-      if (isMultiSig) {
-        addPendingTx({
-          module: activeNotary.module,
-          operation: activeNotary.operation,
-          details: activeNotary.details,
-          requiredSignatures: 3
-        });
-        addLedgerEntry({
-          module: activeNotary.module,
-          operation: activeNotary.operation,
-          status: 'PROVISIONAL',
-          aiVerification: 'Awaiting DAO Multi-sig consensus.'
-        });
-        addLog(`Gemini: Multi-sig required for ${activeNotary.operation}. Transaction moved to Pending.`, 'ai');
-      } else {
-        addLedgerEntry({
-          module: activeNotary.module,
-          operation: activeNotary.operation,
-          status: 'SUCCESS',
-          aiVerification: activeNotary.aiAnalysis || 'Verified by Sentinel.'
-        });
-        addLog(`${activeNotary.operation} successfully notarized and committed.`, 'info');
+    try {
+      // 1. AI SECURITY GATE
+      if (aiVerdict?.verdict === 'REJECTED') {
+        addLog(`CRITICAL: Transaction blocked by Sentinel AI reasoning.`, 'error');
+        addNotification("Security Block: AI detected high risk.", "error");
+        setIsProcessing(false);
+        return;
       }
-      
-      setIsSigning(false);
-      setActiveNotary(null);
-    }, 2000);
+
+      // 2. MULTI-SIG LOGIC (Governance Check)
+      const requiresGovernance = 
+        activeNotary.module === 'Gov' || 
+        activeNotary.module === 'Finance' ||
+        activeNotary.operation.toLowerCase().includes('vault');
+
+      if (requiresGovernance) {
+        // Dispatch to PendingSignatures pool
+        addLog(`DAO_UPLINK: ${activeNotary.operation} moved to Multi-sig queue.`, 'ai');
+        addNotification("Consensus Required: Sent to Multi-sig pool.", "warning");
+      } else {
+        // Direct Execution Simulation
+        addLog(`NOTARIZED: ${activeNotary.operation} committed to block #${blockNumber}.`, 'success');
+        addNotification("Success: Transaction notarized and committed.", "success");
+      }
+
+      // Close Notary after 1.5s delay for visual feedback
+      setTimeout(() => {
+        setActiveNotary(null);
+        setAiVerdict(null);
+      }, 1500);
+
+    } catch (error: any) {
+      addLog(`TX_ERROR: ${error.message}`, 'error');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 bg-black/95 backdrop-blur-2xl">
       <motion.div 
         initial={{ scale: 0.9, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
-        className="w-full max-w-4xl bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+        className="w-full max-w-5xl bg-[#080808] border border-white/10 rounded-[3rem] overflow-hidden shadow-[0_0_150px_rgba(0,0,0,1)] flex flex-col max-h-[90vh] relative"
       >
+        {/* Forensic Background Scanline */}
+        <div className="absolute inset-0 pointer-events-none opacity-[0.03] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[size:100%_4px,3px_100%]" />
+
         {/* Header */}
-        <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/5">
-          <div className="flex items-center gap-3">
-            <FileText className="text-cyan-400" size={24} />
-            <h2 className="font-mono font-bold text-lg tracking-tighter uppercase">{t('notary.title')}</h2>
-          </div>
-          <button onClick={() => setActiveNotary(null)} className="text-white/40 hover:text-white transition-colors">
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Content - Accounting Slip Style */}
-        <div className="flex-1 flex divide-x divide-white/10 overflow-hidden">
-          {/* Left: User Command */}
-          <div className="flex-1 p-8 space-y-6">
-            <div className="space-y-1">
-              <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest">{t('notary.command_label')}</span>
-              <h3 className="text-xl font-bold text-white">{activeNotary.operation}</h3>
+        <div className="p-8 border-b border-white/5 flex items-center justify-between bg-white/[0.02] relative z-10">
+          <div className="flex items-center gap-5">
+            <div className="p-4 bg-cyan-500/10 rounded-[1.2rem] border border-cyan-500/20 shadow-[0_0_20px_rgba(6,182,212,0.1)]">
+              <FileText className="text-cyan-400" size={24} />
             </div>
-
-            <div className="bg-black/40 p-6 rounded-2xl border border-white/5 space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-xs font-mono">
-                <div>
-                  <span className="text-white/40 block mb-1 uppercase">{t('notary.module_label')}</span>
-                  <span className="text-cyan-400">{activeNotary.module}</span>
-                </div>
-                <div>
-                  <span className="text-white/40 block mb-1 uppercase">{t('notary.target_label')}</span>
-                  <span className="text-white">Aoxc{activeNotary.module}Gateway</span>
-                </div>
-                <div className="col-span-2">
-                  <span className="text-white/40 block mb-1 uppercase">{t('notary.details_label')}</span>
-                  <div className="bg-black/60 p-3 rounded-lg text-white/60 break-all">
-                    {JSON.stringify(activeNotary.details)}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 text-amber-400/80 text-xs font-mono bg-amber-400/5 p-4 rounded-xl border border-amber-400/10">
-              <Lock size={16} />
-              <p>{activeNotary.humanTranslation}</p>
-            </div>
-          </div>
-
-          {/* Right: AI Analysis & Flow */}
-          <div className="w-80 p-8 bg-cyan-500/[0.02] flex flex-col gap-6">
-            <div className="space-y-1">
-              <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-widest">{t('notary.analysis_label')}</span>
-              <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
-                <Shield size={16} />
-                <span>APPROVED</span>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest">{t('notary.audit_trail')}</span>
-              <div className="space-y-3 relative">
-                <div className="absolute left-[7px] top-2 bottom-2 w-px bg-white/10" />
-                {['AoxcGateway', 'AoxcSentinel', `Aoxc${activeNotary.module}`, 'AoxcRegistry'].map((step, i) => (
-                  <div key={i} className="flex items-center gap-3 relative z-10">
-                    <div className="w-4 h-4 rounded-full bg-zinc-900 border border-white/20 flex items-center justify-center">
-                      <div className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
-                    </div>
-                    <span className="text-[10px] font-mono text-white/60">{step}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-auto p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-xl">
-              <p className="text-[9px] font-mono text-cyan-400 leading-relaxed">
-                "{t('notary.disclaimer')}"
+            <div>
+              <h2 className="font-mono font-black text-xs uppercase tracking-[0.4em] text-white/90 leading-none mb-2">Contract_Notary_v4</h2>
+              <p className="text-[9px] text-white/20 font-mono font-bold tracking-widest uppercase italic">
+                Uplink: XLayer_Mainnet // Kernel: {blockNumber}
               </p>
             </div>
           </div>
+          <button onClick={() => setActiveNotary(null)} className="p-3 hover:bg-white/5 rounded-2xl transition-all group">
+            <X size={20} className="text-white/20 group-hover:text-white" />
+          </button>
         </div>
 
-        {/* Footer: Signature Action */}
-        <div className="p-8 border-t border-white/10 bg-black/40 flex items-center justify-between">
-          <div className="flex items-center gap-4 text-white/40 font-mono text-[10px]">
-            <Activity size={14} className="animate-pulse text-emerald-500" />
-            <span>XLayer-Reth Node Health: 100%</span>
+        {/* Workflow Image Integration */}
+        
+
+        {/* Core Layout */}
+        <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto relative z-10">
+          
+          {/* Left: Transaction Manifesto */}
+          <div className="flex-1 p-10 space-y-10 border-b lg:border-b-0 lg:border-r border-white/5">
+            <section className="space-y-6">
+              <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-cyan-500/5 border border-cyan-500/10 text-[10px] font-black text-cyan-500 uppercase tracking-widest">
+                <Cpu size={12} /> Operation_Manifest
+              </div>
+              <h3 className="text-4xl font-black text-white tracking-tighter uppercase leading-tight">{activeNotary.operation}</h3>
+              <div className="relative">
+                <div className="absolute -left-4 top-0 bottom-0 w-1 bg-amber-500/30 rounded-full" />
+                <p className="text-amber-400/90 text-[13px] font-mono leading-relaxed bg-amber-500/[0.03] p-6 rounded-[2rem] border border-amber-500/10 italic">
+                  "{activeNotary.humanTranslation || 'No semantic translation available.'}"
+                </p>
+              </div>
+            </section>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <DataField label="Module Origin" value={activeNotary.module} highlight />
+              <DataField label="Security Tier" value={activeNotary.operation.includes('Vault') ? 'Level_4 (Critical)' : 'Level_2 (Standard)'} />
+              
+              <div className="col-span-1 md:col-span-2 space-y-3">
+                <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Payload_Calldata_Dump</span>
+                <div className="bg-black/60 p-6 rounded-[2rem] border border-white/5 font-mono text-[11px] text-white/40 break-all max-h-40 overflow-y-auto scrollbar-hide shadow-inner leading-relaxed">
+                  {JSON.stringify(activeNotary.details, null, 2)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: AI Sentinel Analysis */}
+          <div className="w-full lg:w-[400px] p-10 bg-white/[0.01] flex flex-col gap-10">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.3em]">Sentinel_Verdict</span>
+                {!aiVerdict && <RefreshCw size={16} className="animate-spin text-cyan-500/40" />}
+              </div>
+
+              {aiVerdict ? (
+                <div className={cn(
+                  "p-8 rounded-[2.5rem] border flex flex-col gap-5 relative overflow-hidden transition-all duration-700",
+                  aiVerdict.verdict === 'VERIFIED' ? "bg-emerald-500/5 border-emerald-500/20" : "bg-rose-500/5 border-rose-500/20 shadow-[0_0_40px_rgba(244,63,94,0.1)]"
+                )}>
+                  <div className="flex items-center gap-4">
+                    <div className={cn("p-3 rounded-2xl", aiVerdict.verdict === 'VERIFIED' ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400")}>
+                      {aiVerdict.verdict === 'VERIFIED' ? <Shield size={24} /> : <AlertTriangle size={24} />}
+                    </div>
+                    <span className={cn("font-black text-2xl uppercase tracking-tighter", aiVerdict.verdict === 'VERIFIED' ? "text-emerald-400" : "text-rose-400")}>
+                      {aiVerdict.verdict}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-white/60 font-mono leading-relaxed italic border-l border-white/10 pl-4">
+                    {aiVerdict.aiCommentary}
+                  </p>
+                  <div className="pt-4 border-t border-white/5 flex justify-between items-center text-[11px] font-mono">
+                    <span className="text-white/20 font-black uppercase">Risk_Index:</span>
+                    <span className={cn("font-black", aiVerdict.riskScore > 50 ? "text-rose-500" : "text-emerald-500")}>
+                      {aiVerdict.riskScore}/100
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-48 flex flex-col items-center justify-center bg-white/[0.02] rounded-[2.5rem] border border-dashed border-white/10 gap-4">
+                  <RefreshCw className="text-cyan-500/20 animate-spin" size={32} strokeWidth={1} />
+                  <span className="text-[9px] font-mono text-white/20 uppercase tracking-[0.4em] animate-pulse italic text-center px-6">
+                    Simulating EVM Execution & Neural Context...
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Path Visualizer */}
+            <div className="space-y-6">
+               <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Execution_Propagation</span>
+               <div className="relative pl-8 space-y-8 border-l border-white/10 ml-2">
+                  <PathStep label="Sentinel Guard" status="Active_Monitoring" active />
+                  <PathStep label="Neural Bridge" status="Verdict_Received" active={!!aiVerdict} />
+                  <PathStep label="XLayer Relay" status={isProcessing ? "Broadcasting..." : "Idle_Awaiting"} active={isProcessing} />
+               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Actions */}
+        <div className="p-10 border-t border-white/5 bg-black/60 flex flex-col md:flex-row items-center justify-between gap-8 relative z-10">
+          <div className="flex items-center gap-10">
+            <MetricBox label="Node Status" value="Healthy" color="text-emerald-500" pulse />
+            <div className="h-10 w-px bg-white/5" />
+            <MetricBox label="Gas Forecast" value={`${aiVerdict?.simulatedGas || '---'} Units`} color="text-cyan-400" />
           </div>
 
           <button
             onClick={handleConfirm}
-            disabled={isSigning}
+            disabled={isProcessing || !aiVerdict}
             className={cn(
-              "relative group px-12 py-4 rounded-2xl font-mono font-bold text-sm transition-all overflow-hidden",
-              isSigning 
-                ? "bg-white/10 text-white/40 cursor-not-allowed" 
-                : "bg-cyan-500 text-black hover:shadow-[0_0_30px_rgba(6,182,212,0.4)]"
+              "w-full md:w-auto px-16 py-6 rounded-2xl font-mono font-black text-[11px] uppercase tracking-[0.3em] transition-all duration-500",
+              isProcessing || !aiVerdict
+                ? "bg-white/5 text-white/10 cursor-not-allowed border border-white/5"
+                : aiVerdict.verdict === 'REJECTED' 
+                  ? "bg-rose-900/20 text-rose-500 border border-rose-500/30 cursor-not-allowed"
+                  : "bg-cyan-500 text-black hover:bg-cyan-400 active:scale-95 shadow-[0_0_50px_rgba(6,182,212,0.4)]"
             )}
           >
-            <AnimatePresence mode="wait">
-              {isSigning ? (
-                <motion.div 
-                  key="signing"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex items-center gap-2"
-                >
-                  <RefreshCw className="animate-spin" size={16} />
-                  {t('notary.signing')}
-                </motion.div>
-              ) : (
-                <motion.div 
-                  key="sign"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex items-center gap-2"
-                >
-                  {t('notary.approve')}
-                  <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {isProcessing ? (
+              <div className="flex items-center gap-4">
+                <RefreshCw size={18} className="animate-spin" /> Committing_To_Ledger...
+              </div>
+            ) : aiVerdict?.verdict === 'REJECTED' ? (
+              "Access Denied by Sentinel"
+            ) : (
+              <div className="flex items-center gap-4">
+                Execute Transaction <ArrowRight size={18} strokeWidth={3} />
+              </div>
+            )}
           </button>
         </div>
       </motion.div>
@@ -180,6 +247,34 @@ export const ContractNotary = () => {
   );
 };
 
-const RefreshCw = ({ className, size }: any) => (
-  <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+// --- Atomic Helper Components ---
+
+const DataField = ({ label, value, highlight }: any) => (
+  <div className="space-y-2">
+    <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">{label}</span>
+    <p className={cn("text-base font-mono font-black tracking-tight", highlight ? "text-cyan-400 underline underline-offset-8 decoration-cyan-500/30" : "text-white/80")}>{value}</p>
+  </div>
+);
+
+const PathStep = ({ label, status, active }: any) => (
+  <div className="relative">
+    <div className={cn(
+      "absolute -left-[37px] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 transition-all duration-700",
+      active ? "bg-cyan-500 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.6)]" : "bg-transparent border-white/10"
+    )} />
+    <div className="flex flex-col">
+      <span className={cn("text-[11px] font-black uppercase tracking-wider", active ? "text-white" : "text-white/20")}>{label}</span>
+      <span className="text-[9px] font-mono text-white/30 uppercase tracking-[0.2em]">{status}</span>
+    </div>
+  </div>
+);
+
+const MetricBox = ({ label, value, color, pulse }: any) => (
+  <div className="flex flex-col gap-1">
+    <span className="text-[9px] text-white/20 uppercase font-black tracking-widest leading-none">{label}</span>
+    <div className="flex items-center gap-3">
+      {pulse && <div className={cn("w-2 h-2 rounded-full", color, "animate-pulse")} />}
+      <span className={cn("text-xs font-mono font-black uppercase", color)}>{value}</span>
+    </div>
+  </div>
 );
