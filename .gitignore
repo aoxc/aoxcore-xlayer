@@ -1,42 +1,34 @@
-
 # ==============================================================================
-# 🧠 AOXCORE PROTOCOL | NEURAL & BLOCKCHAIN HYBRID SPEC
-# VERSION: 7.1.0 "Sentinel-Shield" - Integrated Tree Protection
+# 🛡️ AOXCAN PROTOCOL | REFINED GITIGNORE SPEC
+# VERSION: 7.3.0 "Transparent-Sovereign"
 # ==============================================================================
 
-# --- 🤖 AI & DEEP LEARNING (EXCLUDE HEAVY ASSETS) ---
+# --- [🤖 AI & HEAVY NEURAL ASSETS] ---
+# Exclude large model binaries and training checkpoints
 **/model_hub/
-**/outputs/
-**/aoxcan_train_data/
-**/data/*.jsonl
+**/outputs/**/checkpoint-*/
 **/*.safetensors
 **/*.onnx
 **/*.pt
 **/*.pth
 **/*.bin
+**/data/*.jsonl
 
-# --- ⚙️ KERNEL & SOURCE (LOCAL ONLY) ---
-# Kernel dosyalarını Git'te tutmak istemiyorsan (ağırlık yapmaması için) açabilirsin:
-**/evm_kernel/
-**/rust_kernel/
-**/solidity_specs/
-**/xlayer_specs/
-
-# --- 🧪 RUNTIME & SCRIPTS ---
+# --- [⚙️ DEVELOPMENT & RUNTIME] ---
 **/__pycache__/
 **/*.pyc
-**/chat/chat.1.py
-**/yedek/
 .ipynb_checkpoints/
 *.log
+**/yedek/
 
-# --- 🛠️ SMART CONTRACTS & FOUNDRY ---
+# --- [🛠️ BLOCKCHAIN & FOUNDRY] ---
 /out/
 /cache/
 /artifacts/
 foundry.lock
 
-# --- 🔐 SECRETS & NEURAL KEYS (CRITICAL) ---
+# --- [🔐 SECURITY & SENSITIVE DATA] ---
+# Critical: Never expose private keys or environment variables
 .env
 .env.*
 !.env.example
@@ -46,17 +38,16 @@ foundry.lock
 **/secrets/
 **/config_private.py
 
-# --- 📡 BLOCKCHAIN BROADCAST DATA ---
+# --- [📡 NETWORK BROADCASTS] ---
 broadcast/
 !broadcast/*/run-latest.json
 /broadcast/*/31337/
 anvil.log
 
-# --- 💻 OS & IDE ---
+# --- [💻 SYSTEM & IDE SPECIFIC] ---
 .DS_Store
 .vscode/
 .idea/
 *.swp
 *.bak
 *.tmp
-
