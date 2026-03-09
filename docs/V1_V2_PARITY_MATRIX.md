@@ -23,7 +23,7 @@ This document defines measurable compatibility between deployed v1 token behavio
 | Exclusion from transfer limits | Yes | Yes | ✅ | Admin-configurable in both. |
 | Pause/unpause | `PAUSER_ROLE` | `SENTINEL_ROLE` | ⚠️ | Behavior aligned, role mapping differs by governance model. |
 | Restriction API | `addToBlacklist/removeFromBlacklist` | `setRestrictionStatus` | ⚠️ | Different interface shape; same intent. |
-| Mint governance limit cycle | Yearly inflation + hard cap | Governance mint without yearly cycle | ❌ | v2 lacks v1-style yearly mint hardcap logic. |
+| Mint governance limit cycle | Yearly inflation + hard cap | Yearly inflation + hard cap parity added | ✅ | v2 mint window/hardcap now tracks v1-style controls. |
 | Rescue ERC20 | Yes (`rescueERC20`) | Not present | ❌ | Add if treasury ops parity is required. |
 
 ## Required Acceptance Criteria for “Migration Ready”
@@ -33,6 +33,6 @@ This document defines measurable compatibility between deployed v1 token behavio
 4. ❌ All **Gap** capabilities are either implemented or formally waived by governance decision.
 
 ## Next Engineering Items
-1. Implement v2 mint cycle parity with v1 inflation/hardcap semantics.
-2. Decide and document whether `rescueERC20` should exist in v2 core or treasury module.
-3. Add migration rehearsal script for v1->v2 proxy upgrade + post-upgrade invariants.
+1. Decide and document whether `rescueERC20` should exist in v2 core or treasury module.
+2. Add migration rehearsal script for v1->v2 proxy upgrade + post-upgrade invariants.
+3. Expand parity suite with governance-role mapping and emergency repair interoperability checks.
