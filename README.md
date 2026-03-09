@@ -26,30 +26,16 @@
 
 AOXCORE provides a layered architecture for decentralized governance infrastructure combined with operational intelligence systems.
 
-The project focuses on:
+The strategic objective is explicit:
+
+> Deliver a deterministic, auditable, and upgrade-safe DAO execution environment in which AI can assist operators under strict policy boundaries.
+
+The system focuses on:
 
 - upgrade-safe smart contract infrastructure
 - deterministic governance execution
-- AI-assisted operational analysis under strict policy boundaries
+- AI-assisted operational analysis
 - enterprise-grade monitoring and logging systems
-
-The system is designed to reduce attack surface while ensuring long-term protocol maintainability.
-
----
-
-# Key Capabilities
-
-### Governance Infrastructure
-DAO governance primitives designed for deterministic execution and upgrade safety.
-
-### Security Sentinel
-Automated security monitoring and anomaly detection pipelines integrated with governance workflows.
-
-### Upgrade Discipline
-Strict upgrade procedures using UUPS proxy patterns with storage integrity guarantees.
-
-### AI Assisted Operations
-AI tools assist operational analysis while remaining constrained by deterministic policy boundaries.
 
 ---
 
@@ -59,28 +45,28 @@ The repository is organized into layered components.
 
 ## Protocol Layer (`/src`, `/test`, `/script`)
 
-Contains the core smart contracts and validation framework.
+Core on-chain logic and validation environment.
 
-Components include:
+Includes:
 
-- upgradeable governance contracts
-- treasury and financial primitives
+- upgradeable Solidity modules (UUPS + namespaced storage)
+- DAO governance primitives
+- treasury and finance modules
 - registry infrastructure
-- protocol security modules
-- Foundry testing environment
+- security sentinel modules
 
-Testing includes:
+Validation includes:
 
-- unit tests
-- integration tests
+- unit testing
+- integration testing
 - fuzz testing
-- storage layout validation
+- storage layout verification
 
 ---
 
 ## Backend Layer (`/backend`)
 
-Operational service layer supporting monitoring, analysis, and automation.
+Operational service layer for monitoring and automation.
 
 Capabilities include:
 
@@ -93,7 +79,7 @@ Capabilities include:
 
 ## Frontend Layer (`/frontend`)
 
-Operational monitoring console.
+React-based operational console.
 
 Features include:
 
@@ -106,13 +92,27 @@ Features include:
 
 ## CLI Layer (`/cli`)
 
-Command-line tools for protocol operators.
+Command-line utilities for operators.
 
-Tools include:
+Includes tools for:
 
-- state inspection utilities
-- governance interaction tools
-- reconciliation and diagnostics scripts
+- state inspection
+- governance interaction
+- reconciliation diagnostics
+- operational reporting
+
+---
+
+## Governance & Delivery (`/docs`)
+
+Engineering documentation and rollout procedures.
+
+Includes:
+
+- migration runbooks
+- security hardening plans
+- engineering evolution roadmap
+- CI guardrails for storage-slot safety
 
 ---
 
@@ -125,11 +125,11 @@ aoxcore/
 ├─ test/           # Foundry test suite
 ├─ script/         # Deployment and tooling scripts
 │
-├─ backend/        # Sentinel API and monitoring services
-├─ frontend/       # Operator console
-├─ cli/            # Command-line operational tooling
+├─ backend/        # Sentinel API services
+├─ frontend        # Operator console
+├─ cli             # Command-line operational tools
 │
-├─ docs/           # Documentation and governance specs
+├─ docs            # Governance and architecture documentation
 │
 ├─ foundry.toml
 ├─ package.json
@@ -138,21 +138,61 @@ aoxcore/
 
 ---
 
-# Prerequisites
+# Core Design Principles
 
-Before running the project locally, ensure the following tools are installed.
+### Determinism Before Automation
 
-- Node.js ≥ 18
-- Foundry toolchain
-- Git
-- Python 3 (for auxiliary validation scripts)
+AI assists operational workflows but does not replace governance controls.
 
-Install Foundry:
+Privileged actions remain:
 
-```
-curl -L https://foundry.paradigm.xyz | bash
-foundryup
-```
+- policy gated
+- attributable
+- reviewable
+
+---
+
+### Upgrade Safety by Default
+
+Upgrade discipline relies on:
+
+- ERC-7201 namespaced storage
+- migration rehearsal
+- post-upgrade invariant verification
+
+---
+
+### Logs as Operational Truth
+
+Operational reliability depends on structured logging.
+
+Capabilities include:
+
+- request correlation identifiers
+- event categorization
+- forensic reconstruction support
+
+---
+
+### Separation of Duties
+
+Governance authority is distributed across distinct roles:
+
+- governance execution
+- security sentinel
+- audit verification
+- upgrade authorization
+
+---
+
+### Progressive Hardening
+
+Security posture improves continuously through:
+
+- CI validation gates
+- regression testing
+- storage-slot parity checks
+- automated remediation workflows
 
 ---
 
@@ -160,23 +200,25 @@ foundryup
 
 ## Protocol Engineering
 
+Build contracts:
+
 ```
 forge build
 ```
 
-Run storage validation:
+Verify storage layout:
 
 ```
 python script/check_storage_slots.py
 ```
 
-Run full test suite:
+Run tests:
 
 ```
 forge test
 ```
 
-Run fuzz tests:
+Run fuzz testing:
 
 ```
 forge test --fuzz
@@ -204,97 +246,92 @@ npm run dev
 
 ---
 
-# Logging and Observability
+# Security Gates
 
-AOXCORE uses structured logging designed for forensic analysis.
+## Storage Slot Safety
 
-Logging features include:
+```
+python script/check_storage_slots.py
+```
 
-- request correlation identifiers
-- security event categorization
-- operator-safe error reporting
-- detailed forensic diagnostic logging
+## Static Solidity Validation
 
-Logs are treated as a first-class operational artifact.
+```
+python script/static_solidity_sanity.py
+```
 
 ---
 
 # Upgrade Model
 
-AOXCORE smart contracts use the **UUPS upgradeable proxy model**.
+AOXCORE contracts use the **UUPS Upgradeable Proxy pattern**.
 
-Upgrade procedures include:
+Upgrade process includes:
 
-- storage layout validation
-- migration rehearsal
-- multisig governance approval
-- post-upgrade verification
-
-Upgrade safety is treated as a core protocol invariant.
+1. storage layout verification
+2. migration rehearsal
+3. multisig governance approval
+4. invariant verification after upgrade
 
 ---
 
-# Security
+# Migration Readiness References
 
-Security considerations include:
+Key operational documents:
 
-- role-separated governance permissions
-- upgrade authorization controls
-- storage layout integrity checks
-- regression testing
-- fuzz testing
+- `docs/V1_V2_PARITY_MATRIX.md`
+- `docs/MIGRATION_REHEARSAL_RUNBOOK.md`
+- `script/RehearseV1ToV2.s.sol`
+- `script/VerifyV1ToV2Invariants.s.sol`
 
-Security documentation is available in:
+---
 
-```
-docs/SECURITY.md
-```
+# Logging and Observability
 
-Responsible disclosure guidelines are also included in the repository.
+AOXCORE uses structured logging to support operational forensics.
+
+Features include:
+
+- request IDs for every backend call
+- security event categorization
+- operator-safe error reporting
+- full forensic diagnostic context
+
+Documentation:
+
+- `docs/LOGGING_AND_OPERATIONS_STANDARD.md`
+- `docs/DEVELOPMENT_FULL_EVOLUTION_PLAN.md`
+- `docs/XLAYER_SUI_FULL_GATEWAY_BLUEPRINT.md`
+- `docs/WEB_PUBLISH_AND_RC_CHECKLIST.md`
+- `docs/GOVERNANCE_ENTERPRISE_REFACTOR_PLAN.md`
 
 ---
 
 # Development Workflow
 
-Typical development flow:
+Typical development cycle:
 
 1. implement feature
 2. add tests
 3. run storage validation
-4. run fuzz tests
+4. run fuzz testing
 5. open pull request
-6. CI validation pipeline executes
+6. CI validation executes
 
-Only verified changes are merged into the main branch.
-
----
-
-# Documentation
-
-Further documentation can be found in the `/docs` directory.
-
-Key documents include:
-
-- Logging & Operations Standard
-- Development Evolution Plan
-- XLayer Gateway Blueprint
-- Release Candidate Checklist
-- Governance Refactor Plan
+Only validated changes are merged.
 
 ---
 
 # Contribution Guidelines
 
-Contributions are welcome through pull requests.
+Contributions must:
 
-All contributions must:
-
-- include appropriate tests
-- maintain upgrade safety guarantees
+- include relevant tests
+- preserve upgrade safety
 - follow repository coding standards
 - pass CI validation
 
-See `docs/CONTRIBUTING.md` for details.
+See `docs/CONTRIBUTING.md`.
 
 ---
 

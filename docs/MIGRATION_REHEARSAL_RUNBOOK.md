@@ -18,6 +18,7 @@ This runbook defines a deterministic rehearsal process for migrating from `AOXC.
 ### Step 1 — Static Safety Gates
 ```bash
 python script/check_storage_slots.py
+python script/static_solidity_sanity.py
 ```
 
 ### Step 1.5 — CLI Operator Preflight
