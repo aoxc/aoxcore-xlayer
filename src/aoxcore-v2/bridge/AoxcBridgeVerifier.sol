@@ -56,6 +56,10 @@ contract AoxcBridgeVerifier is Initializable, AccessControlUpgradeable, UUPSUpgr
     event SourceChainSupportUpdated(uint256 indexed chainId, bool enabled);
     event CommandSupportUpdated(CommandType indexed commandType, bool enabled);
     event BridgePausedUpdated(bool pausedState);
+    mapping(bytes32 => bool) public consumedPackets;
+    mapping(address => uint256) public nonces;
+
+    event PacketVerified(bytes32 indexed packetId, CommandType commandType, address indexed origin, address indexed target);
 
     constructor() {
         _disableInitializers();
@@ -84,6 +88,10 @@ contract AoxcBridgeVerifier is Initializable, AccessControlUpgradeable, UUPSUpgr
         if (!enabledCommands[uint8(packet.commandType)]) revert AoxcErrors.Aoxc_CustomRevert("BRIDGE: COMMAND_DISABLED");
         if (!supportedSourceChains[packet.sourceChainId]) revert AoxcErrors.Aoxc_ChainNotSupported(packet.sourceChainId);
         if (packet.origin == address(0) || packet.target == address(0)) revert AoxcErrors.Aoxc_InvalidAddress();
+        _grantRole(AoxcConstants.UPGRADER_ROLE, admin);
+    }
+
+    function verifyAndConsume(UnifiedNeuralPacket calldata packet) external returns (bytes32 packetId) {
         if (packet.deadline < block.timestamp) revert AoxcErrors.Aoxc_Neural_HandshakeExpired(packet.deadline, block.timestamp);
         if (packet.nonce != nonces[packet.origin]) revert AoxcErrors.Aoxc_Neural_InvalidNonce(packet.nonce, nonces[packet.origin]);
 

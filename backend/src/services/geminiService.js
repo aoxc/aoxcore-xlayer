@@ -7,6 +7,23 @@ function heuristicAnalyze({ prompt, context }, provider = 'fallback-local') {
   const highRiskWords = ['delegatecall', 'drain', 'exploit', 'malicious', 'bypass', 'reentrancy'];
   const found = highRiskWords.filter((word) => lowered.includes(word));
   const risk = Math.min(100, 20 + found.length * 15);
+async function analyzeWithGemini({ prompt, context }) {
+  // Controlled fallback for development and environments without AI credentials.
+  if (!config.geminiApiKey) {
+    return {
+      risk: 35,
+      action: 'REVIEW',
+      reason: 'Gemini API key not configured; deterministic fallback analysis applied.',
+      provider: 'fallback-local'
+    };
+  }
+
+  // Placeholder integration boundary (can be replaced with @google/generative-ai call).
+  const lowered = `${prompt} ${context}`.toLowerCase();
+  const highRiskWords = ['delegatecall', 'drain', 'exploit', 'malicious'];
+  const found = highRiskWords.filter((w) => lowered.includes(w));
+
+  const risk = Math.min(100, 20 + found.length * 20);
 
   return {
     risk,
@@ -75,6 +92,10 @@ async function analyzeWithGemini({ prompt, context }) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+    provider: 'gemini-bridge-stub'
+  };
 }
 
 module.exports = { analyzeWithGemini };
