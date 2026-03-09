@@ -12,8 +12,6 @@ pragma solidity 0.8.33;
 // --- Interfaces & Libraries ---
 import {IAoxcCore} from "aoxc-interfaces/IAoxcCore.sol";
 import {IAoxcSentinel} from "aoxc-interfaces/IAoxcSentinel.sol";
-import {IAoxcAutoRepair} from "aoxc-interfaces/IAoxcAutoRepair.sol";
-import {IAoxcStorage} from "aoxc-interfaces/IAoxcStorage.sol";
 import {AoxcConstants} from "aoxc-libraries/AoxcConstants.sol";
 import {AoxcErrors} from "aoxc-libraries/AoxcErrors.sol";
 import {AoxcEvents} from "aoxc-libraries/AoxcEvents.sol";
@@ -31,7 +29,6 @@ import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Nonce
 import {VotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/utils/VotesUpgradeable.sol";
 import {ERC20VotesUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @dev External interface for legacy V1 token interoperability.
@@ -42,7 +39,9 @@ interface IAoxcV1 {
     function removeFromBlacklist(address account) external;
 }
 
-
+event NeuralTransferPermitPrepared(address indexed origin, address indexed to, uint256 amount, uint256 nonce);
+event NeuralProtectionModeUpdated(address indexed account, bool enabled);
+event CriticalAddressUpdated(address indexed account, bool enabled);
 
 contract AoxcCore is
     Initializable,
@@ -59,7 +58,12 @@ contract AoxcCore is
     ERC20VotesUpgradeable,     
     UUPSUpgradeable
 {
-    using SafeERC20 for IERC20;
+    uint256 public constant YEAR_SECONDS = 365 days;
+    uint256 public constant HARD_CAP_INFLATION_BPS = 600;
+    uint256 public constant V1_PARITY_ANCHOR_SUPPLY = 100_000_000_000 * 1e18;
+
+    uint8 private constant MODE_FLAG_CRITICAL = 1 << 0;
+    uint8 private constant MODE_FLAG_NEURAL_OPT_IN = 1 << 1;
 
     /*//////////////////////////////////////////////////////////////
                 NAMESPACED STORAGE (ERC-7201 COMPLIANT)
@@ -72,7 +76,10 @@ contract AoxcCore is
         address nexusHub;
         uint256 lastPulse;
         uint256 anchorSupply;
+        uint256 yearlyMintLimit;
+        uint256 lastMintTimestamp;
         uint256 mintedThisYear;
+        uint256 maxTransferAmount;
         uint256 dailyTransferLimit;
         bool aiFailSafeActive;
         bool globalLock;
@@ -82,6 +89,10 @@ contract AoxcCore is
         mapping(address => bool) isExcludedFromLimits;
         mapping(address => uint256) dailySpent;
         mapping(address => uint256) lastTransferDay;
+        mapping(address => uint8) modeFlags;
+        mapping(address => uint256) transferPermitNonce;
+        mapping(bytes32 => bool) transferPermits;
+        mapping(bytes32 => uint48) transferPermitExpiry;
         mapping(address => uint256) userNonces;
         mapping(bytes4 => bool) quarantinedSelectors;
     }
@@ -119,6 +130,11 @@ contract AoxcCore is
         address admin,
         bytes32 integrityHash
     ) external initializer {
+        if (admin == address(0) || nexus == address(0) || sentinel == address(0)) {
+            revert AoxcErrors.Aoxc_InvalidAddress();
+        }
+        if (integrityHash == bytes32(0)) revert AoxcErrors.Aoxc_CustomRevert("CORE: ZERO_INTEGRITY_HASH");
+
         __ERC20_init("AoxcCore", "AOXC");
         __ERC20Permit_init("AoxcCore");
         __ReentrancyGuard_init();
@@ -133,8 +149,11 @@ contract AoxcCore is
         $.repairEngine = repair;
         $.protocolHash = integrityHash;
         $.lastPulse = block.timestamp;
-        $.dailyTransferLimit = 1_000_000 * 1e18;
-        $.anchorSupply = 100_000_000 * 1e18;
+        $.maxTransferAmount = 500_000_000 * 1e18;
+        $.dailyTransferLimit = 1_000_000_000 * 1e18;
+        $.anchorSupply = V1_PARITY_ANCHOR_SUPPLY;
+        $.yearlyMintLimit = ($.anchorSupply * HARD_CAP_INFLATION_BPS) / AoxcConstants.BPS_DENOMINATOR;
+        $.lastMintTimestamp = block.timestamp;
         $.aiFailSafeActive = true;
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
@@ -145,6 +164,7 @@ contract AoxcCore is
 
         $.isExcludedFromLimits[admin] = true;
         $.isExcludedFromLimits[nexus] = true;
+        $.isExcludedFromLimits[address(this)] = true;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -205,15 +225,108 @@ contract AoxcCore is
     }
 
     function mint(address to, uint256 amount) external override onlyRole(AoxcConstants.GOVERNANCE_ROLE) {
+        CoreStorage storage $ = _getStore();
+        if ($.blacklisted[to]) revert AoxcErrors.Aoxc_Blacklisted(to, $.blacklistReason[to]);
+
+        if (block.timestamp >= $.lastMintTimestamp + YEAR_SECONDS) {
+            uint256 periods = (block.timestamp - $.lastMintTimestamp) / YEAR_SECONDS;
+            $.lastMintTimestamp += periods * YEAR_SECONDS;
+            $.mintedThisYear = 0;
+        }
+
+        if ($.mintedThisYear + amount > $.yearlyMintLimit) revert AoxcErrors.Aoxc_InflationHardcapReached();
+        if (totalSupply() + amount > $.anchorSupply * 3) revert AoxcErrors.Aoxc_InflationHardcapReached();
+
+        $.mintedThisYear += amount;
         _mint(to, amount);
-        if (_getStore().v1TokenLegacy != address(0)) {
-            try IAoxcV1(_getStore().v1TokenLegacy).mint(to, amount) {} catch {}
+        if ($.v1TokenLegacy != address(0)) {
+            try IAoxcV1($.v1TokenLegacy).mint(to, amount) {} catch {}
         }
     }
 
     function burn(address from, uint256 amount) external override {
         if (_msgSender() != from) _checkRole(AoxcConstants.GOVERNANCE_ROLE, _msgSender());
         _burn(from, amount);
+    }
+
+    /**
+     * @notice V1 compatibility: admin-managed transfer velocity limits.
+     */
+    function setTransferVelocity(uint256 maxTx, uint256 dailyLimit) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        CoreStorage storage $ = _getStore();
+        $.maxTransferAmount = maxTx;
+        $.dailyTransferLimit = dailyLimit;
+    }
+
+    /**
+     * @notice V1 compatibility: admin exclusion from velocity controls.
+     */
+    function setExclusionFromLimits(address account, bool status) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _getStore().isExcludedFromLimits[account] = status;
+    }
+
+    function pause() external onlyRole(AoxcConstants.SENTINEL_ROLE) { _pause(); }
+
+    function unpause() external onlyRole(AoxcConstants.SENTINEL_ROLE) { _unpause(); }
+
+    function isBlacklisted(address account) external view returns (bool) {
+        return _getStore().blacklisted[account];
+    }
+
+    function getMintPolicy() external view returns (uint256 yearlyLimit, uint256 mintedInCurrentYear, uint256 windowStart) {
+        CoreStorage storage $ = _getStore();
+        return ($.yearlyMintLimit, $.mintedThisYear, $.lastMintTimestamp);
+    }
+
+    function _isNeuralProtected(CoreStorage storage $, address account) internal view returns (bool) {
+        return ($.modeFlags[account] & (MODE_FLAG_CRITICAL | MODE_FLAG_NEURAL_OPT_IN)) != 0;
+    }
+
+    /**
+     * @notice Marks or unmarks an account as critical-risk for transfer controls.
+     * @dev Critical accounts require prepared neural permits for outbound transfers.
+     */
+    function setCriticalAddress(address account, bool enabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        CoreStorage storage $ = _getStore();
+        uint8 flags = $.modeFlags[account];
+        if (enabled) $.modeFlags[account] = flags | MODE_FLAG_CRITICAL;
+        else $.modeFlags[account] = flags & ~MODE_FLAG_CRITICAL;
+        emit CriticalAddressUpdated(account, enabled);
+    }
+
+    /**
+     * @notice Enables or disables optional neural protection mode for caller transfers.
+     */
+    function setNeuralProtectMode(bool enabled) external {
+        CoreStorage storage $ = _getStore();
+        uint8 flags = $.modeFlags[_msgSender()];
+        if (enabled) $.modeFlags[_msgSender()] = flags | MODE_FLAG_NEURAL_OPT_IN;
+        else $.modeFlags[_msgSender()] = flags & ~MODE_FLAG_NEURAL_OPT_IN;
+        emit NeuralProtectionModeUpdated(_msgSender(), enabled);
+    }
+
+    /**
+     * @notice Prepares a one-time neural permit bound to transfer tuple and nonce.
+     * @dev Permit expires at `packet.deadline` and is consumed on the next matching transfer.
+     */
+    function prepareNeuralTransfer(address to, uint256 amount, NeuralPacket calldata packet) external {
+        CoreStorage storage $ = _getStore();
+        if (!_isNeuralProtected($, _msgSender())) {
+            revert AoxcErrors.Aoxc_Neural_ModeDisabled(_msgSender());
+        }
+        if (packet.origin != _msgSender() || packet.target != to || packet.value != amount) {
+            revert AoxcErrors.Aoxc_Neural_InvalidPacketBinding();
+        }
+        if (!IAoxcSentinel($.sentinelAi).validateNeuralPacket(packet)) {
+            revert AoxcErrors.Aoxc_Neural_SecurityVeto(_msgSender(), packet.riskScore);
+        }
+
+        uint256 nonce = $.transferPermitNonce[_msgSender()];
+        bytes32 permitId = keccak256(abi.encode(_msgSender(), to, amount, nonce));
+        $.transferPermits[permitId] = true;
+        $.transferPermitExpiry[permitId] = packet.deadline;
+
+        emit NeuralTransferPermitPrepared(_msgSender(), to, amount, nonce);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -271,8 +384,41 @@ contract AoxcCore is
             revert AoxcErrors.Aoxc_GlobalLockActive();
         }
         
-        if (from != address(0) && $.blacklisted[from]) {
-            revert AoxcErrors.Aoxc_Blacklisted(from, $.blacklistReason[from]);
+        if (from != address(0)) {
+            if ($.blacklisted[from]) revert AoxcErrors.Aoxc_Blacklisted(from, $.blacklistReason[from]);
+            if (to != address(0) && !$.isExcludedFromLimits[from]) {
+                if (amount > $.maxTransferAmount) revert AoxcErrors.Aoxc_ExceedsMaxTransfer(amount, $.maxTransferAmount);
+                uint256 day = block.timestamp / 1 days;
+                if ($.lastTransferDay[from] != day) {
+                    $.dailySpent[from] = 0;
+                    $.lastTransferDay[from] = day;
+                }
+                uint256 remaining = $.dailyTransferLimit - $.dailySpent[from];
+                if (amount > remaining) revert AoxcErrors.Aoxc_ExceedsDailyLimit(amount, remaining);
+                $.dailySpent[from] += amount;
+
+                if (_isNeuralProtected($, from)) {
+                    uint256 nonce = $.transferPermitNonce[from];
+                    bytes32 permitId = keccak256(abi.encode(from, to, amount, nonce));
+                    if (!$.transferPermits[permitId]) {
+                        revert AoxcErrors.Aoxc_Neural_PermitMissing(from, to, amount, nonce);
+                    }
+                    uint48 expiry = $.transferPermitExpiry[permitId];
+                    if (expiry < block.timestamp) {
+                        delete $.transferPermits[permitId];
+                        delete $.transferPermitExpiry[permitId];
+                        $.transferPermitNonce[from] = nonce + 1;
+                        revert AoxcErrors.Aoxc_Neural_PermitExpired(expiry, block.timestamp);
+                    }
+                    delete $.transferPermits[permitId];
+                    delete $.transferPermitExpiry[permitId];
+                    $.transferPermitNonce[from] = nonce + 1;
+                }
+            }
+        }
+
+        if (to != address(0) && $.blacklisted[to]) {
+            revert AoxcErrors.Aoxc_Blacklisted(to, $.blacklistReason[to]);
         }
 
         super._update(from, to, amount);
