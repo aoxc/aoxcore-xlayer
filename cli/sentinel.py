@@ -20,6 +20,10 @@ def _headers() -> dict:
 
 def _get(path: str, timeout: int = 8):
     return requests.get(f"{BACKEND_URL}{path}", headers=_headers(), timeout=timeout)
+    h = {"Content-Type": "application/json"}
+    if SENTINEL_TOKEN:
+        h["x-sentinel-token"] = SENTINEL_TOKEN
+    return h
 
 
 @click.group()
@@ -33,6 +37,7 @@ def status():
     """Check backend health and show operational endpoint state."""
     try:
         resp = _get("/health")
+        resp = requests.get(f"{BACKEND_URL}/health", timeout=8)
         if resp.ok:
             data = resp.json()
             console.print(
@@ -101,6 +106,8 @@ def rehearse(tx_hash: str):
     except Exception as exc:
         console.print(f"[red]Rehearsal request error: {exc}[/red]")
 
+
+@cli.command()
 
 @cli.command()
 @click.argument("tx_hash")
