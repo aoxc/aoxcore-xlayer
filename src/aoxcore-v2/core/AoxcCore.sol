@@ -285,6 +285,7 @@ contract AoxcCore is
      * @notice Marks or unmarks an account as critical-risk for transfer controls.
      * @dev Critical accounts require prepared neural permits for outbound transfers.
      */
+     
     function setCriticalAddress(address account, bool enabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _getStore().criticalAddress[account] = enabled;
         emit CriticalAddressUpdated(account, enabled);
@@ -293,6 +294,7 @@ contract AoxcCore is
     /**
      * @notice Enables or disables optional neural protection mode for caller transfers.
      */
+
     function setNeuralProtectMode(bool enabled) external {
         _getStore().neuralProtectOptIn[_msgSender()] = enabled;
         emit NeuralProtectionModeUpdated(_msgSender(), enabled);
@@ -309,6 +311,14 @@ contract AoxcCore is
         }
         if (packet.origin != _msgSender() || packet.target != to || packet.value != amount) {
             revert AoxcErrors.Aoxc_Neural_InvalidPacketBinding();
+
+    function prepareNeuralTransfer(address to, uint256 amount, NeuralPacket calldata packet) external {
+        CoreStorage storage $ = _getStore();
+        if (!(($.criticalAddress[_msgSender()]) || $.neuralProtectOptIn[_msgSender()])) {
+            revert AoxcErrors.Aoxc_CustomRevert("CORE: NEURAL_MODE_DISABLED");
+        }
+        if (packet.origin != _msgSender() || packet.target != to || packet.value != amount) {
+            revert AoxcErrors.Aoxc_CustomRevert("CORE: INVALID_PACKET_BINDING");
         }
         if (!IAoxcSentinel($.sentinelAi).validateNeuralPacket(packet)) {
             revert AoxcErrors.Aoxc_Neural_SecurityVeto(_msgSender(), packet.riskScore);
@@ -407,6 +417,11 @@ contract AoxcCore is
                     delete $.transferPermitExpiry[permitId];
                     $.transferPermitNonce[from] = nonce + 1;
                 }
+                    if (!$.transferPermits[permitId]) revert AoxcErrors.Aoxc_CustomRevert("CORE: MISSING_NEURAL_PERMIT");
+                    delete $.transferPermits[permitId];
+                    $.transferPermitNonce[from] = nonce + 1;
+                }
+
             }
         }
 
