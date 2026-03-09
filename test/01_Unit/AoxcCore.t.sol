@@ -116,4 +116,63 @@ contract AoxcCoreTest is Test {
         vm.prank(user);
         core.transfer(admin, 100);
     }
+
+
+    function test_TransferVelocity_MaxTx_Enforced() public {
+        vm.prank(nexus);
+        core.mint(user, 2_000);
+
+        vm.prank(admin);
+        core.setTransferVelocity(100, 10_000);
+
+        vm.expectRevert();
+        vm.prank(user);
+        core.transfer(admin, 101);
+    }
+
+    function test_TransferVelocity_DailyLimit_Enforced() public {
+        vm.prank(nexus);
+        core.mint(user, 500);
+
+        vm.prank(admin);
+        core.setTransferVelocity(1_000, 200);
+
+        vm.prank(user);
+        core.transfer(admin, 150);
+
+        vm.expectRevert();
+        vm.prank(user);
+        core.transfer(admin, 60);
+    }
+
+    function test_Blacklisted_Recipient_CannotReceive() public {
+        vm.prank(nexus);
+        core.mint(user, 200);
+
+        vm.prank(sentinel);
+        core.setRestrictionStatus(admin, true, "NO_RECEIVE");
+
+        vm.expectRevert();
+        vm.prank(user);
+        core.transfer(admin, 10);
+    }
+
+    function test_Pause_Unpause_By_Sentinel() public {
+        vm.prank(sentinel);
+        core.pause();
+
+        vm.prank(nexus);
+        core.mint(user, 100);
+
+        vm.expectRevert();
+        vm.prank(user);
+        core.transfer(admin, 1);
+
+        vm.prank(sentinel);
+        core.unpause();
+
+        vm.prank(user);
+        core.transfer(admin, 1);
+    }
+
 }

@@ -73,6 +73,7 @@ contract AoxcCore is
         uint256 lastPulse;
         uint256 anchorSupply;
         uint256 mintedThisYear;
+        uint256 maxTransferAmount;
         uint256 dailyTransferLimit;
         bool aiFailSafeActive;
         bool globalLock;
@@ -138,7 +139,8 @@ contract AoxcCore is
         $.repairEngine = repair;
         $.protocolHash = integrityHash;
         $.lastPulse = block.timestamp;
-        $.dailyTransferLimit = 1_000_000 * 1e18;
+        $.maxTransferAmount = 500_000_000 * 1e18;
+        $.dailyTransferLimit = 1_000_000_000 * 1e18;
         $.anchorSupply = 100_000_000 * 1e18;
         $.aiFailSafeActive = true;
 
@@ -150,6 +152,7 @@ contract AoxcCore is
 
         $.isExcludedFromLimits[admin] = true;
         $.isExcludedFromLimits[nexus] = true;
+        $.isExcludedFromLimits[address(this)] = true;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -210,6 +213,8 @@ contract AoxcCore is
     }
 
     function mint(address to, uint256 amount) external override onlyRole(AoxcConstants.GOVERNANCE_ROLE) {
+        CoreStorage storage $ = _getStore();
+        if ($.blacklisted[to]) revert AoxcErrors.Aoxc_Blacklisted(to, $.blacklistReason[to]);
         _mint(to, amount);
         if (_getStore().v1TokenLegacy != address(0)) {
             try IAoxcV1(_getStore().v1TokenLegacy).mint(to, amount) {} catch {}
@@ -219,6 +224,30 @@ contract AoxcCore is
     function burn(address from, uint256 amount) external override {
         if (_msgSender() != from) _checkRole(AoxcConstants.GOVERNANCE_ROLE, _msgSender());
         _burn(from, amount);
+    }
+
+    /**
+     * @notice V1 compatibility: admin-managed transfer velocity limits.
+     */
+    function setTransferVelocity(uint256 maxTx, uint256 dailyLimit) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        CoreStorage storage $ = _getStore();
+        $.maxTransferAmount = maxTx;
+        $.dailyTransferLimit = dailyLimit;
+    }
+
+    /**
+     * @notice V1 compatibility: admin exclusion from velocity controls.
+     */
+    function setExclusionFromLimits(address account, bool status) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _getStore().isExcludedFromLimits[account] = status;
+    }
+
+    function pause() external onlyRole(AoxcConstants.SENTINEL_ROLE) { _pause(); }
+
+    function unpause() external onlyRole(AoxcConstants.SENTINEL_ROLE) { _unpause(); }
+
+    function isBlacklisted(address account) external view returns (bool) {
+        return _getStore().blacklisted[account];
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -276,8 +305,23 @@ contract AoxcCore is
             revert AoxcErrors.Aoxc_GlobalLockActive();
         }
         
-        if (from != address(0) && $.blacklisted[from]) {
-            revert AoxcErrors.Aoxc_Blacklisted(from, $.blacklistReason[from]);
+        if (from != address(0)) {
+            if ($.blacklisted[from]) revert AoxcErrors.Aoxc_Blacklisted(from, $.blacklistReason[from]);
+            if (to != address(0) && !$.isExcludedFromLimits[from]) {
+                if (amount > $.maxTransferAmount) revert AoxcErrors.Aoxc_ExceedsMaxTransfer(amount, $.maxTransferAmount);
+                uint256 day = block.timestamp / 1 days;
+                if ($.lastTransferDay[from] != day) {
+                    $.dailySpent[from] = 0;
+                    $.lastTransferDay[from] = day;
+                }
+                uint256 remaining = $.dailyTransferLimit - $.dailySpent[from];
+                if (amount > remaining) revert AoxcErrors.Aoxc_ExceedsDailyLimit(amount, remaining);
+                $.dailySpent[from] += amount;
+            }
+        }
+
+        if (to != address(0) && $.blacklisted[to]) {
+            revert AoxcErrors.Aoxc_Blacklisted(to, $.blacklistReason[to]);
         }
 
         super._update(from, to, amount);
