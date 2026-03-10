@@ -113,6 +113,8 @@ Includes:
 - security hardening plans
 - engineering evolution roadmap
 - CI guardrails for storage-slot safety
+- XLayer + Sui legacy-honor execution plan
+- AoxCore-XAS modest revolution plan
 
 ---
 
@@ -122,6 +124,7 @@ Includes:
 aoxcore/
 │
 ├─ src/            # Solidity smart contracts
+│  └─ aoxcore-xas/ # New XAS-centric Move + Solidity modules
 ├─ test/           # Foundry test suite
 ├─ script/         # Deployment and tooling scripts
 │
