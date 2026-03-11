@@ -18,6 +18,10 @@
 > This repository is currently in its **Core Hardening Phase**.  
 > Architectural foundations are established while security gates, upgrade guarantees, and validation workflows are being progressively strengthened.
 
+> **Production Risk Disclosure (Pre-Mainnet / Design-Hardening Stage)**  
+> AOXCORE is currently under active architecture and security hardening.  
+> Until an independent external audit and final governance signoff are completed, this codebase should be treated as **pre-production** and **operationally risky for unmanaged mainnet use**.
+
 </div>
 
 ---
@@ -115,6 +119,7 @@ Includes:
 - CI guardrails for storage-slot safety
 - XLayer + Sui legacy-honor execution plan
 - AoxCore-XAS modest revolution plan
+- V1→V2 mainnet migration and audit readiness baseline
 
 ---
 
@@ -349,3 +354,15 @@ See the `LICENSE` file for details.
 <div align="center">
   <sub>© 2026 AOXCORE Protocol | Secure. Auditable. Upgrade-Safe.</sub>
 </div>
+---
+
+# Mainnet Migration Readiness (V1 → V2)
+
+For production upgrade discipline (storage continuity, governance safety, and audit evidence), follow:
+
+- `docs/V1_V2_MAINNET_AUDIT_READINESS.md`
+- `docs/MIGRATION_REHEARSAL_RUNBOOK.md`
+- `docs/V1_V2_PARITY_MATRIX.md`
+- `docs/SECURITY.md`
+
+These documents define the minimum acceptance criteria before mainnet upgrade execution.
