@@ -416,6 +416,7 @@ Detailed integration and migration blueprint:
 Additional sectioned standalone layout docs:
 
 - `docs/AOXC_STANDALONE_LIBRARY_LAYOUT.md`
+- `docs/AOXCHAIN_BACKEND_INTERFACE_CONTRACT.md`
 
 
 ---

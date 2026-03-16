@@ -45,3 +45,15 @@ New sectioned system primitives for fully independent chain usage:
 - `system/modules/examples/AoxcExampleTreasuryModule.sol`
 
 These modules are designed for strict external consumption and do not require V1/V2 naming coupling.
+
+
+## Backend/Chain Preflight
+
+Use these commands before chain-side deployment:
+
+```bash
+python3 script/generate_library_manifest.py
+python3 script/validate_library_consumer_config.py \
+  src/aoxc-library/manifest/approved-modules.json \
+  configs/aoxchain.consumer.example.json
+```
