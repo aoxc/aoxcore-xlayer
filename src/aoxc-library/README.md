@@ -12,3 +12,8 @@ This folder exposes stable module-oriented entry contracts for consumers.
 - infra: `AoxcAutoRepairModule`
 
 All module contracts currently inherit the maintained V2 implementation contracts.
+
+
+## Constructor Notes
+
+- `AoxcDaoManagerModule` constructor requires `(address registry_, address token_, uint256 lifespan_)` and forwards these to `AoxcDaoManager`.
