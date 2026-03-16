@@ -17,3 +17,18 @@ All module contracts currently inherit the maintained V2 implementation contract
 ## Constructor Notes
 
 - `AoxcDaoManagerModule` constructor requires `(address registry_, address token_, uint256 lifespan_)` and forwards these to `AoxcDaoManager`.
+
+
+## Approved Module Manifest
+
+Machine-readable module catalog for external consumers:
+
+- `src/aoxc-library/manifest/approved-modules.json`
+
+Regenerate after wrapper/constructor changes:
+
+```bash
+python3 script/generate_library_manifest.py
+```
+
+Downstream chains/CLIs (e.g. aoxchain) should consume wrappers via this manifest only.

@@ -400,6 +400,21 @@ These documents define the minimum acceptance criteria before mainnet upgrade ex
 
 ---
 
+## Library Consumer Integration (AOXCHAIN)
+
+For external-chain consumption (e.g. `aoxchain`), use the wrapper modules under `src/aoxc-library` and the generated approved-manifest:
+
+```bash
+python3 script/generate_library_manifest.py
+cat src/aoxc-library/manifest/approved-modules.json
+```
+
+Detailed integration and migration blueprint:
+
+- `docs/AOXCHAIN_LIBRARY_INTEGRATION.md`
+
+---
+
 ## Foundry Installation Runbook (Production-Friendly)
 
 Use this checklist for deterministic local setup and CI runners:
