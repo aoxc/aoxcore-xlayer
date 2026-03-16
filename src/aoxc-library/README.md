@@ -32,3 +32,16 @@ python3 script/generate_library_manifest.py
 ```
 
 Downstream chains/CLIs (e.g. aoxchain) should consume wrappers via this manifest only.
+
+
+## Standalone System Modules (Sectioned)
+
+New sectioned system primitives for fully independent chain usage:
+
+- `system/interfaces/IAoxcModule.sol`
+- `system/registry/AoxcModuleRegistry.sol`
+- `system/factory/AoxcModuleFactory.sol`
+- `system/modules/examples/AoxcExampleTokenModule.sol`
+- `system/modules/examples/AoxcExampleTreasuryModule.sol`
+
+These modules are designed for strict external consumption and do not require V1/V2 naming coupling.

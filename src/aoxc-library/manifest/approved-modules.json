@@ -1,6 +1,7 @@
 {
   "schema_version": "1.0.0",
   "generated_from": "script/generate_library_manifest.py",
+  "module_count": 11,
   "module_count": 9,
   "modules": [
     {
@@ -61,6 +62,22 @@
       "contract": "AoxcCpexStakingModule",
       "base_contract": "AoxcCpex",
       "base_import": "aoxc-finance/AoxcCpex.sol",
+      "constructor_args": []
+    },
+    {
+      "module_id": "aoxcexampletoken",
+      "file": "src/aoxc-library/system/modules/examples/AoxcExampleTokenModule.sol",
+      "contract": "AoxcExampleTokenModule",
+      "base_contract": "IAoxcModule",
+      "base_import": "aoxc-library/system/interfaces/IAoxcModule.sol",
+      "constructor_args": []
+    },
+    {
+      "module_id": "aoxcexampletreasury",
+      "file": "src/aoxc-library/system/modules/examples/AoxcExampleTreasuryModule.sol",
+      "contract": "AoxcExampleTreasuryModule",
+      "base_contract": "IAoxcModule",
+      "base_import": "@openzeppelin/contracts/token/ERC20/IERC20.sol",
       "constructor_args": []
     },
     {

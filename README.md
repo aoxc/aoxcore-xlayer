@@ -413,6 +413,11 @@ Detailed integration and migration blueprint:
 
 - `docs/AOXCHAIN_LIBRARY_INTEGRATION.md`
 
+Additional sectioned standalone layout docs:
+
+- `docs/AOXC_STANDALONE_LIBRARY_LAYOUT.md`
+
+
 ---
 
 ## Foundry Installation Runbook (Production-Friendly)
