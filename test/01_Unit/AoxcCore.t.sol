@@ -8,6 +8,9 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {AoxcCore} from "aoxc-v2/core/AoxcCore.sol";
 import {AoxcConstants} from "aoxc-v2/libraries/AoxcConstants.sol";
 import {AoxcErrors} from "aoxc-v2/libraries/AoxcErrors.sol";
+import "aoxc-v2/core/AoxcCore.sol";
+import "aoxc-v2/libraries/AoxcConstants.sol";
+import "aoxc-v2/libraries/AoxcErrors.sol";
 import {MockLegacyV1Token} from "test/mocks/MockLegacyV1Token.sol";
 
 contract MockSentinelLocal {

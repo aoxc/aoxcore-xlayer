@@ -2,6 +2,7 @@
   "schema_version": "1.0.0",
   "generated_from": "script/generate_library_manifest.py",
   "module_count": 11,
+  "module_count": 9,
   "modules": [
     {
       "module_id": "aoxcgateway",

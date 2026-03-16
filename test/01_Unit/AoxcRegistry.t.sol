@@ -119,6 +119,8 @@ contract AoxcRegistryTest is Test {
         for(uint256 i = 0; i < maxMembers; i++) {
             // casting to uint160 is safe because loop index is tiny and deterministic in tests
             // forge-lint: disable-next-line(unsafe-typecast)
+            // forge-lint: disable-next-line(unsafe-typecast)
+            // casting to uint160 is safe because loop index is tiny and deterministic in tests
             registry.onboardMember(address(uint160(i + 1000)));
         }
         
