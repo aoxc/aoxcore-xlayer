@@ -19,15 +19,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 // AOXC INFRASTRUCTURE
 import {IAoxcCore} from "aoxc-interfaces/IAoxcCore.sol";
 import {IAoxcSentinel} from "aoxc-interfaces/IAoxcSentinel.sol";
-import {IAoxcStorage} from "aoxc-interfaces/IAoxcStorage.sol";
-// FIX: Path ve Dosya ismi senin klasör yapına göre CamelCase yapıldı
 import {IAoxcGateway} from "aoxc-interfaces/IAoxcGateway.sol"; 
 import {AoxcConstants} from "aoxc-libraries/AoxcConstants.sol";
 import {AoxcErrors} from "aoxc-libraries/AoxcErrors.sol";
 import {AoxcEvents} from "aoxc-libraries/AoxcEvents.sol";
 
 contract AoxcGateway is
-    IAoxcGateway, // FIX: Interface ismi güncellendi
+    IAoxcGateway,
     Initializable,
     UUPSUpgradeable,
     AccessControlUpgradeable,
