@@ -145,6 +145,8 @@ contract AoxcRegistry is
         uint256 oldRep = citizen.reputation;
         // casting to int256 is safe because oldRep is bounded by maxReputation, far below int256 max
         // forge-lint: disable-next-line(unsafe-typecast)
+        // forge-lint: disable-next-line(unsafe-typecast)
+        // casting to int256 is safe because oldRep is bounded by maxReputation, far below int256 max
         int256 newRep = int256(oldRep) + adjustment;
 
         if (newRep < 0) newRep = 0;
@@ -152,6 +154,8 @@ contract AoxcRegistry is
 
         // casting to uint256 is safe because newRep is clamped to [0, maxReputation]
         // forge-lint: disable-next-line(unsafe-typecast)
+        // forge-lint: disable-next-line(unsafe-typecast)
+        // casting to uint256 is safe because newRep is clamped to [0, maxReputation]
         citizen.reputation = uint256(newRep);
         citizen.lastPulse = uint64(block.timestamp);
 
@@ -159,6 +163,8 @@ contract AoxcRegistry is
 
         // casting to uint256 is safe because newRep is clamped to [0, maxReputation]
         // forge-lint: disable-next-line(unsafe-typecast)
+        // forge-lint: disable-next-line(unsafe-typecast)
+        // casting to uint256 is safe because newRep is clamped to [0, maxReputation]
         emit AoxcEvents.ReputationUpdated(member, oldRep, uint256(newRep), reasonCode);
     }
 
